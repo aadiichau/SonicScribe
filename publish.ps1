@@ -13,6 +13,7 @@ dotnet publish $projectFile `
     --self-contained true `
     -p:PublishTrimmed=false `
     -p:WindowsPackageType=None `
+    -p:WindowsAppSDKSelfContained=true `
     -o $distFolder
 
 if ($LASTEXITCODE -ne 0) {

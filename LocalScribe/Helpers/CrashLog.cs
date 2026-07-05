@@ -9,6 +9,27 @@ public static class CrashLog
         AppBranding.DataFolderName,
         "logs");
 
+    public static void WriteMessage(string source, string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(LogFolder);
+            var path = Path.Combine(LogFolder, "crash.log");
+            var entry = $"""
+                [{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}] {source}
+                {message}
+                ---
+
+                """;
+
+            File.AppendAllText(path, entry);
+        }
+        catch
+        {
+            // Best effort crash logging.
+        }
+    }
+
     public static void Write(string source, Exception exception)
     {
         try
