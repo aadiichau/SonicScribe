@@ -101,6 +101,9 @@ public partial class TranscribeViewModel : ObservableObject
     [ObservableProperty]
     private string _setupProgressMessage = string.Empty;
 
+    [ObservableProperty]
+    private bool _isModelLoading;
+
     public ObservableCollection<QueueJobItemViewModel> QueueItems { get; } = [];
 
     public ObservableCollection<TranscriptLineViewModel> TranscriptLines { get; } = [];
@@ -582,6 +585,7 @@ public partial class TranscribeViewModel : ObservableObject
         if (!isActive)
         {
             HasActiveJob = false;
+            IsModelLoading = false;
             return;
         }
 
@@ -589,6 +593,7 @@ public partial class TranscribeViewModel : ObservableObject
         ActiveFileName = job.DisplayName;
         ActiveProgress = job.Progress;
         ActiveLogMessage = job.LogMessage;
+        IsModelLoading = job.Status == TranscriptionJobStatus.LoadingModel;
     }
 
     private void ClearTranscriptView()
@@ -728,7 +733,15 @@ public partial class TranscribeViewModel : ObservableObject
         }
     }
 
-    public string ActiveProgressLabel => $"{ActiveProgress}%";
+    public string ActiveProgressLabel => IsModelLoading ? "Loading model..." : $"{ActiveProgress}%";
+
+    public bool IsProgressIndeterminate => IsModelLoading;
+
+    partial void OnIsModelLoadingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ActiveProgressLabel));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+    }
 
     public Visibility ProgressPanelVisibility => ShowProgressPanel ? Visibility.Visible : Visibility.Collapsed;
 

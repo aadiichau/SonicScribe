@@ -4,7 +4,7 @@ namespace LocalScribe.Models;
 
 public sealed class AppSettings
 {
-    public string DefaultModel { get; set; } = "large-v3";
+    public string DefaultModel { get; set; } = "medium";
 
     public string DefaultLanguage { get; set; } = "auto";
 

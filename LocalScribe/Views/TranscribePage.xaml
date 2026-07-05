@@ -278,7 +278,16 @@
                             TextWrapping="WrapWholeWords" />
                         <ProgressBar
                             Maximum="100"
+                            IsIndeterminate="{x:Bind ViewModel.IsProgressIndeterminate, Mode=OneWay}"
+                            ShowError="False"
+                            ShowPaused="False"
                             Value="{x:Bind ViewModel.ActiveProgress, Mode=OneWay}" />
+                        <TextBlock
+                            FontSize="12"
+                            Opacity="0.65"
+                            Text="First transcription downloads the AI model — can take 5–30 minutes. Do not close the app."
+                            TextWrapping="WrapWholeWords"
+                            Visibility="{x:Bind ViewModel.IsModelLoading, Mode=OneWay}" />
                     </StackPanel>
 
                     <!-- Transcript -->
