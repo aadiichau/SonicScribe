@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="SonicScribe About screen" width="900" />
+  <img src="docs/screenshot.png" alt="SonicScribe Transcribe screen" width="900" />
 </p>
 
 ---
