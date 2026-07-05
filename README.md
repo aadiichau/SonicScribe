@@ -35,8 +35,8 @@
 
 | Package | Description |
 |---------|-------------|
-| [**Installer (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-Setup-v1.0.1.exe) | `SonicScribe-Setup-v1.0.1.exe` — install like a normal Windows app |
-| [**Portable zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.1-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe` (no install) |
+| [**Installer (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-Setup-v1.0.2.exe) | `SonicScribe-Setup-v1.0.2.exe` — install like a normal Windows app |
+| [**Portable zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.2-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe` (no install) |
 
 | | |
 |---|---|
@@ -45,7 +45,7 @@
 
 ### Install with the setup exe (recommended)
 
-1. Download **`SonicScribe-Setup-v1.0.1.exe`**
+1. Download **`SonicScribe-Setup-v1.0.2.exe`**
 2. Run the installer → Next → Install
 3. Launch from Start Menu (optional desktop shortcut)
 4. Install Python prerequisites (below) on first use
@@ -78,7 +78,7 @@
 
 ## Prerequisites
 
-SonicScribe is a desktop shell around Whisper. Users still need Python + ML libraries on their PC (one-time setup).
+SonicScribe is a desktop shell around Whisper. On first launch, use **Install everything** in Settings (or accept the setup prompt) to automatically install Python, faster-whisper, PyTorch, and FFmpeg.
 
 ### 1. Python 3.11 or 3.12
 
@@ -104,9 +104,15 @@ pip install faster-whisper torch torchvision torchaudio
 winget install Gyan.FFmpeg
 ```
 
-### 4. First launch
+### 4. First launch (automatic — recommended)
 
-Open **Settings** in SonicScribe → **Auto-detect Python** → **Re-detect GPU** (if you have an NVIDIA card).
+On first launch, SonicScribe offers **Install everything**. Or go to **Settings → Automatic Setup → Install everything**.
+
+This installs Python 3.12, faster-whisper, PyTorch (GPU if NVIDIA detected), and FFmpeg via `winget` + `pip`. First run can take 10–30 minutes.
+
+### Manual setup (optional)
+
+If you prefer manual install, use the commands below, then **Settings → Auto-detect Python → Re-detect GPU**.
 
 ---
 
@@ -170,7 +176,7 @@ Everything stays on your computer. No telemetry, no cloud API calls for transcri
 
 ### App won't open / nothing happens when I double-click
 
-1. **Download v1.0.1 or later** — older builds required the Windows App Runtime to be installed separately. v1.0.1 bundles it.
+1. **Download v1.0.2 or later** — older builds required the Windows App Runtime to be installed separately. v1.0.1+ bundles it.
 2. **Use the installer or keep the portable folder intact** — do not move `SonicScribe.exe` out of its folder; it needs the DLLs beside it.
 3. **Check crash logs** — if startup fails, open `%LOCALAPPDATA%\SonicScribe\logs\crash.log`.
 4. **Requirements** — 64-bit Windows 10 (1809+) or Windows 11. 32-bit Windows is not supported.

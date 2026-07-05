@@ -96,4 +96,89 @@ public static class ProcessRunner
             StandardError = errorBuilder.ToString().Trim()
         };
     }
+
+    public static async Task<ProcessResult> RunWithLiveOutputAsync(
+        string fileName,
+        string arguments,
+        Action<string>? onOutputLine,
+        Action<string>? onErrorLine,
+        CancellationToken cancellationToken = default,
+        int timeoutMs = 1_800_000)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            }
+        };
+        ApplyPythonUtf8Environment(process.StartInfo);
+
+        var outputBuilder = new StringBuilder();
+        var errorBuilder = new StringBuilder();
+
+        process.OutputDataReceived += (_, args) =>
+        {
+            if (args.Data is null)
+            {
+                return;
+            }
+
+            outputBuilder.AppendLine(args.Data);
+            onOutputLine?.Invoke(args.Data);
+        };
+
+        process.ErrorDataReceived += (_, args) =>
+        {
+            if (args.Data is null)
+            {
+                return;
+            }
+
+            errorBuilder.AppendLine(args.Data);
+            onErrorLine?.Invoke(args.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeoutMs);
+
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup after timeout.
+            }
+
+            throw new TimeoutException($"Process '{fileName}' timed out after {timeoutMs}ms.");
+        }
+
+        return new ProcessResult
+        {
+            ExitCode = process.ExitCode,
+            StandardOutput = outputBuilder.ToString().Trim(),
+            StandardError = errorBuilder.ToString().Trim()
+        };
+    }
 }

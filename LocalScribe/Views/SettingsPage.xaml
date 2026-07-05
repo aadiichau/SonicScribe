@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:LocalScribe.ViewModels"
     mc:Ignorable="d"
     Background="Transparent">
 
@@ -22,6 +23,85 @@
                     Style="{StaticResource PageSubtitleTextBlockStyle}"
                     Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
             </StackPanel>
+
+            <!-- One-click setup -->
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource SectionHeaderTextBlockStyle}"
+                            Text="AUTOMATIC SETUP" />
+                        <ProgressRing
+                            HorizontalAlignment="Right"
+                            Width="20"
+                            Height="20"
+                            IsActive="{x:Bind ViewModel.IsCheckingPrerequisites, Mode=OneWay}" />
+                    </Grid>
+
+                    <TextBlock
+                        Text="{x:Bind ViewModel.SetupStatusMessage, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.PrerequisiteLines, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PrerequisiteLineViewModel">
+                                <Grid
+                                    Margin="0,0,0,10"
+                                    ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        Grid.Column="0"
+                                        VerticalAlignment="Top"
+                                        FontSize="14"
+                                        Glyph="{x:Bind StatusGlyph, Mode=OneWay}" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind Name, Mode=OneWay}" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Opacity="0.75"
+                                            Text="{x:Bind StatusText, Mode=OneWay}"
+                                            TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock
+                        FontSize="12"
+                        Opacity="0.65"
+                        Text="Installs Python 3.12, faster-whisper, PyTorch, and FFmpeg using winget + pip. First run may take 10–30 minutes."
+                        TextWrapping="WrapWholeWords" />
+
+                    <TextBlock
+                        FontFamily="Consolas"
+                        FontSize="12"
+                        Opacity="0.85"
+                        Text="{x:Bind ViewModel.SetupProgressMessage, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords"
+                        Visibility="{x:Bind ViewModel.ShowSetupProgress, Mode=OneWay}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            Command="{x:Bind ViewModel.InstallEverythingCommand}"
+                            Content="Install everything"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <Button
+                            Command="{x:Bind ViewModel.CheckPrerequisitesCommand}"
+                            Content="Re-check" />
+                        <ProgressRing
+                            Width="20"
+                            Height="20"
+                            IsActive="{x:Bind ViewModel.IsInstallingPrerequisites, Mode=OneWay}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
             <!-- Transcription defaults -->
             <Border Style="{StaticResource PlaceholderCardStyle}">

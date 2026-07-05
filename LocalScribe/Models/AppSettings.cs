@@ -21,4 +21,6 @@ public sealed class AppSettings
     public string? LegacyHistoryPath { get; set; }
 
     public string? PythonExecutablePath { get; set; }
+
+    public bool HasDismissedSetupPrompt { get; set; }
 }

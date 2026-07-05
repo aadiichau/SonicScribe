@@ -37,6 +37,12 @@ public sealed partial class MainWindow : Window
         StartupOverlay.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    public void SetStartupOverlayMessage(string title, string subtitle)
+    {
+        StartupTitleText.Text = title;
+        StartupSubtitleText.Text = subtitle;
+    }
+
     private void ConfigureWindowIcon()
     {
         var iconPath = AssetPathHelper.GetAssetPath("Assets/AppIcon.ico");

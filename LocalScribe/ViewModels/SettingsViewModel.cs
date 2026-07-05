@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LocalScribe.Helpers;
@@ -13,6 +14,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IFilePickerService _filePickerService;
     private readonly IShellService _shellService;
     private readonly IWhisperEngineHost _whisperEngineHost;
+    private readonly IPrerequisiteSetupService _prerequisiteSetupService;
     private string? _savedPythonPath;
 
     [ObservableProperty]
@@ -51,6 +53,28 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetectingDevice;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallEverythingCommand))]
+    private bool _isCheckingPrerequisites;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallEverythingCommand))]
+    private bool _isInstallingPrerequisites;
+
+    [ObservableProperty]
+    private string _setupStatusMessage = "One-click setup installs Python, faster-whisper, PyTorch, and FFmpeg.";
+
+    [ObservableProperty]
+    private string _setupProgressMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _showSetupProgress;
+
+    [ObservableProperty]
+    private bool _isTranscriptionReady;
+
+    public ObservableCollection<PrerequisiteLineViewModel> PrerequisiteLines { get; } = [];
+
     public IReadOnlyList<ModelOption> AvailableModels { get; } =
     [
         new("large-v3", "large-v3 — Best quality"),
@@ -66,13 +90,15 @@ public partial class SettingsViewModel : ObservableObject
         IDeviceDetectionService deviceDetectionService,
         IFilePickerService filePickerService,
         IShellService shellService,
-        IWhisperEngineHost whisperEngineHost)
+        IWhisperEngineHost whisperEngineHost,
+        IPrerequisiteSetupService prerequisiteSetupService)
     {
         _settingsService = settingsService;
         _deviceDetectionService = deviceDetectionService;
         _filePickerService = filePickerService;
         _shellService = shellService;
         _whisperEngineHost = whisperEngineHost;
+        _prerequisiteSetupService = prerequisiteSetupService;
     }
 
     public async Task InitializeAsync()
@@ -80,7 +106,69 @@ public partial class SettingsViewModel : ObservableObject
         await _settingsService.LoadAsync();
         ApplySettingsToView();
         await RefreshDeviceInfoAsync(forceRefresh: false);
+        await CheckPrerequisitesAsync();
     }
+
+    [RelayCommand]
+    private async Task CheckPrerequisitesAsync()
+    {
+        IsCheckingPrerequisites = true;
+        SetupStatusMessage = "Checking prerequisites...";
+
+        try
+        {
+            var report = await _prerequisiteSetupService.CheckAsync();
+            ApplyPrerequisiteReport(report);
+            SetupStatusMessage = report.IsTranscriptionReady
+                ? "All required components are installed. You are ready to transcribe."
+                : "Some components are missing. Use Install everything to set up automatically.";
+        }
+        catch (Exception ex)
+        {
+            SetupStatusMessage = $"Prerequisite check failed: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingPrerequisites = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanInstallPrerequisites))]
+    private async Task InstallEverythingAsync()
+    {
+        IsInstallingPrerequisites = true;
+        ShowSetupProgress = true;
+        SetupProgressMessage = "Starting automatic setup...";
+        SetupStatusMessage = "Installing prerequisites. This can take 10–30 minutes on first run.";
+
+        try
+        {
+            var progress = new Progress<PrerequisiteSetupProgress>(update =>
+            {
+                SetupProgressMessage = $"{update.Step}: {update.Message}";
+            });
+
+            var report = await _prerequisiteSetupService.InstallMissingAsync(progress);
+            ApplyPrerequisiteReport(report);
+            _whisperEngineHost.InvalidateWorker();
+            await RefreshDeviceInfoAsync(forceRefresh: true);
+            SetupStatusMessage = report.IsTranscriptionReady
+                ? "Setup complete! You can start transcribing."
+                : "Setup finished with warnings. Review the checklist below.";
+        }
+        catch (Exception ex)
+        {
+            SetupStatusMessage = $"Automatic setup failed: {ex.Message}";
+        }
+        finally
+        {
+            IsInstallingPrerequisites = false;
+            ShowSetupProgress = false;
+            InstallEverythingCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanInstallPrerequisites() => !IsInstallingPrerequisites && !IsCheckingPrerequisites;
 
     [RelayCommand]
     private async Task SaveAsync()
@@ -251,6 +339,26 @@ public partial class SettingsViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(device.ProbeError))
         {
             StatusMessage = $"Device note: {device.ProbeError}";
+        }
+    }
+
+    private void ApplyPrerequisiteReport(PrerequisiteReport report)
+    {
+        IsTranscriptionReady = report.IsTranscriptionReady;
+
+        if (PrerequisiteLines.Count == 0)
+        {
+            foreach (var item in report.Items)
+            {
+                PrerequisiteLines.Add(new PrerequisiteLineViewModel(item));
+            }
+
+            return;
+        }
+
+        for (var i = 0; i < report.Items.Count && i < PrerequisiteLines.Count; i++)
+        {
+            PrerequisiteLines[i].Apply(report.Items[i]);
         }
     }
 }

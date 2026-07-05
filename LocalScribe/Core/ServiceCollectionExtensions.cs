@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<LegacyHistoryImporter>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDeviceDetectionService, DeviceDetectionService>();
+        services.AddSingleton<IPrerequisiteSetupService, PrerequisiteSetupService>();
         services.AddSingleton<IHistoryService, HistoryService>();
         services.AddSingleton<AppStartupService>();
         services.AddSingleton<IClipboardService, ClipboardService>();

@@ -35,11 +35,13 @@
                     Height="48"
                     IsActive="True" />
                 <TextBlock
+                    x:Name="StartupTitleText"
                     HorizontalAlignment="Center"
                     FontSize="16"
                     FontWeight="SemiBold"
                     Text="Starting SonicScribe..." />
                 <TextBlock
+                    x:Name="StartupSubtitleText"
                     HorizontalAlignment="Center"
                     Opacity="0.7"
                     Text="Loading settings, history, and GPU profile"
