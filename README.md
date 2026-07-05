@@ -35,21 +35,28 @@
 
 | Package | Description |
 |---------|-------------|
-| [**Portable (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.0-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe`. No installer. |
-| [**Mirror zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-win-x64.zip) | Same portable build, shorter filename. |
+| [**Installer (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-Setup-v1.0.0.exe) | `SonicScribe-Setup-v1.0.0.exe` — install like a normal Windows app |
+| [**Portable zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.0-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe` (no install) |
 
 | | |
 |---|---|
-| **Size** | ~75 MB zipped (~200 MB extracted) |
+| **Installer size** | ~80 MB |
 | **Platform** | Windows 10/11, 64-bit |
-| **Type** | Self-contained portable app (not a single-file exe) |
 
-1. Download the **Portable** zip
-2. Unzip to any folder (e.g. `Desktop\SonicScribe`)
-3. Install Python prerequisites (below)
-4. Run `SonicScribe.exe` or `Start SonicScribe.bat`
+### Install with the setup exe (recommended)
 
-> **Important:** Keep every file in the folder together. The `.exe` needs the DLLs beside it.
+1. Download **`SonicScribe-Setup-v1.0.0.exe`**
+2. Run the installer → Next → Install
+3. Launch from Start Menu (optional desktop shortcut)
+4. Install Python prerequisites (below) on first use
+
+### Or use portable zip
+
+1. Download the portable zip and unzip
+2. Run `SonicScribe.exe` or `Start SonicScribe.bat`
+3. Keep all files in the folder together
+
+> **Note:** SonicScribe cannot be a single tiny `.exe` — WinUI needs ~200 MB of libraries. The **installer** is one download that sets everything up in `Program Files`.
 
 ---
 

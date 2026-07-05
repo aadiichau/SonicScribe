@@ -8,10 +8,12 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $releasesFolder = Join-Path $projectRoot "releases"
+$versionNumber = $Version.TrimStart("v", "V")
 $portableZip = Join-Path $releasesFolder "SonicScribe-$Version-Portable-win-x64.zip"
 $legacyZip = Join-Path $releasesFolder "SonicScribe-win-x64.zip"
+$setupExe = Join-Path $releasesFolder "SonicScribe-Setup-v$versionNumber.exe"
 
-if (-not (Test-Path $portableZip)) {
+if (-not (Test-Path $portableZip) -or -not (Test-Path $setupExe)) {
     Write-Host "Packages not found. Building..." -ForegroundColor Cyan
     & (Join-Path $projectRoot "release.ps1") -Version $Version
 }
@@ -49,9 +51,12 @@ if ($gh) {
         $notes = @"
 ## SonicScribe $Version
 
-### Portable download (recommended)
-- **SonicScribe-$Version-Portable-win-x64.zip** — unzip anywhere and run. No installer.
-- Double-click ``SonicScribe.exe`` or ``Start SonicScribe.bat``.
+### Installer (recommended for most users)
+- **SonicScribe-Setup-v$versionNumber.exe** — run to install SonicScribe like a normal Windows app.
+- Adds Start Menu shortcut and optional desktop icon. Includes uninstaller.
+
+### Portable zip (no install)
+- **SonicScribe-$Version-Portable-win-x64.zip** — unzip anywhere and run ``SonicScribe.exe``.
 
 ### Requirements
 - Windows 10/11 (64-bit)
@@ -63,13 +68,14 @@ See the [README](https://github.com/$Repo#readme) for setup commands.
 
         & gh release view $Version -R $Repo 2>$null
         if ($LASTEXITCODE -eq 0) {
-            & gh release upload $Version $portableZip $legacyZip -R $Repo --clobber
+            & gh release upload $Version $setupExe $portableZip $legacyZip -R $Repo --clobber
         }
         else {
             & gh release create $Version `
                 --repo $Repo `
                 --title "SonicScribe $Version" `
                 --notes $notes `
+                $setupExe `
                 $portableZip `
                 $legacyZip
         }
@@ -107,7 +113,7 @@ $headers = @{
 $releaseBody = @{
     tag_name = $Version
     name = "SonicScribe $Version"
-    body = "Portable Windows build. Unzip and run SonicScribe.exe. Python + faster-whisper required."
+    body = "Windows installer + portable zip. Python + faster-whisper still required for transcription."
     draft = $false
     prerelease = $false
 } | ConvertTo-Json
@@ -125,16 +131,27 @@ catch {
 }
 
 function Upload-Asset($filePath) {
-    $fileName = [Uri]::EscapeDataString([IO.Path]::GetFileName($filePath))
+    $baseName = [IO.Path]::GetFileName($filePath)
+    $fileName = [Uri]::EscapeDataString($baseName)
+
+    $existing = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$Repo/releases/$($release.id)/assets" -Headers $headers
+    foreach ($asset in $existing) {
+        if ($asset.name -eq $baseName) {
+            Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$Repo/releases/assets/$($asset.id)" -Headers $headers | Out-Null
+        }
+    }
+
     $uploadUrl = "https://uploads.github.com/repos/$Repo/releases/$($release.id)/assets?name=$fileName"
     $bytes = [IO.File]::ReadAllBytes($filePath)
+    $contentType = if ([IO.Path]::GetExtension($filePath) -eq ".exe") { "application/octet-stream" } else { "application/zip" }
     Invoke-RestMethod -Method Post -Uri $uploadUrl -Headers @{
         Authorization = "Bearer $token"
         Accept = "application/vnd.github+json"
-    } -Body $bytes -ContentType "application/zip" | Out-Null
-    Write-Host "  Uploaded $([IO.Path]::GetFileName($filePath))" -ForegroundColor Green
+    } -Body $bytes -ContentType $contentType | Out-Null
+    Write-Host "  Uploaded $baseName" -ForegroundColor Green
 }
 
+Upload-Asset $setupExe
 Upload-Asset $portableZip
 Upload-Asset $legacyZip
 

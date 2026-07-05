@@ -58,4 +58,8 @@ Write-Host "Release packages ready!" -ForegroundColor Green
 Write-Host "  Portable: $portableZip ($sizeMb MB)"
 Write-Host "  Mirror:   $legacyZip"
 Write-Host ""
+Write-Host "Building Windows installer..." -ForegroundColor Cyan
+& (Join-Path $projectRoot "build-installer.ps1") -Version $Version
+
+Write-Host ""
 Write-Host "Run .\publish-release.ps1 -Version $Version to upload to GitHub Releases." -ForegroundColor Yellow
