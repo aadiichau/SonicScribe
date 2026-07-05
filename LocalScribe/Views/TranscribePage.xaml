@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="LocalScribe.Views.TranscribePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewmodels="using:LocalScribe.ViewModels"
+    mc:Ignorable="d"
+    AllowDrop="True"
+    Background="{ThemeResource LayerFillColorDefaultBrush}"
+    DragOver="Page_DragOver"
+    DragLeave="Page_DragLeave"
+    Drop="Page_Drop"
+    Loaded="TranscribePage_Loaded">
+
+    <Grid Padding="24" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="280" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock
+                FontSize="28"
+                FontWeight="SemiBold"
+                Text="Transcribe" />
+            <TextBlock
+                Opacity="0.8"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                TextWrapping="WrapWholeWords" />
+            <TextBlock
+                Opacity="0.75"
+                Text="{x:Bind ViewModel.ModelLabel, Mode=OneWay}" />
+        </StackPanel>
+
+        <!-- Toolbar -->
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button
+                    MinWidth="100"
+                    Command="{x:Bind ViewModel.StartQueueCommand}"
+                    Content="Start"
+                    Style="{StaticResource AccentButtonStyle}" />
+                <Button Command="{x:Bind ViewModel.PauseQueueCommand}" Content="Pause" />
+                <Button Command="{x:Bind ViewModel.CancelActiveCommand}" Content="Cancel" />
+                <Button Command="{x:Bind ViewModel.ClearQueueCommand}" Content="Clear queue" />
+            </StackPanel>
+
+            <ComboBox
+                x:Name="LanguageComboBox"
+                Grid.Column="1"
+                Width="260"
+                VerticalAlignment="Center"
+                DisplayMemberPath="DisplayName"
+                IsTextSearchEnabled="True"
+                ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
+                MaxDropDownHeight="420"
+                PlaceholderText="Language"
+                SelectionChanged="LanguageComboBox_SelectionChanged" />
+
+            <TextBlock
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Opacity="0.75"
+                Text="{x:Bind ViewModel.ProcessingStatusLabel, Mode=OneWay}" />
+        </Grid>
+
+        <!-- Drop zone -->
+        <Border
+            x:Name="DropZone"
+            Grid.Row="2"
+            MinHeight="120"
+            Padding="24"
+            AllowDrop="True"
+            Background="#FF1E293B"
+            BorderBrush="#FF3B82F6"
+            BorderThickness="2"
+            CornerRadius="12"
+            DragOver="DropZone_DragOver"
+            DragLeave="DropZone_DragLeave"
+            Drop="DropZone_Drop">
+            <Grid ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon
+                    VerticalAlignment="Center"
+                    FontSize="32"
+                    Foreground="#FF3B82F6"
+                    Glyph="&#xE8B5;" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Text="Drop audio or video files here" />
+                    <TextBlock
+                        Foreground="#FF94A3B8"
+                        Text="MP3 · MP4 · WAV · M4A · FLAC · MKV · WEBM" />
+                </StackPanel>
+                <Button
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    MinWidth="130"
+                    Command="{x:Bind ViewModel.BrowseFilesCommand}"
+                    Content="Browse files"
+                    Style="{StaticResource AccentButtonStyle}" />
+            </Grid>
+        </Border>
+
+        <!-- Queue + transcript -->
+        <Grid Grid.Row="3" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Spacing="8">
+                <Grid>
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Opacity="0.7"
+                        Text="QUEUE" />
+                    <TextBlock
+                        HorizontalAlignment="Right"
+                        Opacity="0.75"
+                        Text="{x:Bind ViewModel.QueueCountLabel, Mode=OneWay}" />
+                </Grid>
+
+                <ListView
+                    ItemsSource="{x:Bind ViewModel.QueueItems, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.SelectedQueueItem, Mode=TwoWay}"
+                    SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:QueueJobItemViewModel">
+                            <Grid Padding="12,8" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind DisplayName}" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Opacity="0.65"
+                                        Text="{x:Bind FileName}" />
+                                </StackPanel>
+                                <TextBlock
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Text="{x:Bind StatusLabel}" />
+                                <Button
+                                    Grid.Column="2"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="RemoveQueueItem_Click"
+                                    Tag="{x:Bind}"
+                                    ToolTipService.ToolTip="Remove from queue"
+                                    Visibility="{x:Bind RemoveButtonVisibility}">
+                                    <FontIcon
+                                        FontSize="12"
+                                        Foreground="#FF94A3B8"
+                                        Glyph="&#xE711;" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+
+            <Border
+                Grid.Column="1"
+                Padding="16"
+                Background="#FF111827"
+                BorderBrush="#FF334155"
+                BorderThickness="1"
+                CornerRadius="8">
+                <Grid>
+                    <!-- Progress -->
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.ProgressPanelVisibility, Mode=OneWay}">
+                        <TextBlock
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Opacity="0.7"
+                            Text="PROCESSING" />
+                        <TextBlock
+                            FontSize="16"
+                            FontWeight="SemiBold"
+                            Text="{x:Bind ViewModel.ActiveFileName, Mode=OneWay}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Opacity="0.85"
+                            Text="{x:Bind ViewModel.ActiveLogMessage, Mode=OneWay}"
+                            TextWrapping="WrapWholeWords" />
+                        <ProgressBar
+                            Maximum="100"
+                            Value="{x:Bind ViewModel.ActiveProgress, Mode=OneWay}" />
+                    </StackPanel>
+
+                    <!-- Transcript -->
+                    <Grid
+                        RowSpacing="12"
+                        Visibility="{x:Bind ViewModel.TranscriptPanelVisibility, Mode=OneWay}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Opacity="0.7"
+                                Text="TRANSCRIPT" />
+                            <TextBlock
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind ViewModel.ViewingFileName, Mode=OneWay}" />
+                            <TextBlock
+                                FontSize="12"
+                                Opacity="0.7"
+                                Text="{x:Bind ViewModel.TranscriptStatsLabel, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                            <ToggleSwitch
+                                OffContent="Plain"
+                                OnContent="Timestamps"
+                                IsOn="{x:Bind ViewModel.ShowTimestamps, Mode=TwoWay}" />
+                            <Button
+                                Command="{x:Bind ViewModel.DownloadTxtCommand}"
+                                Content="Download TXT"
+                                Style="{StaticResource AccentButtonStyle}" />
+                            <Button
+                                Command="{x:Bind ViewModel.CopyTranscriptCommand}"
+                                Content="Copy all" />
+                            <Button
+                                Command="{x:Bind ViewModel.ExportTxtCommand}"
+                                Content="Open TXT" />
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="2"
+                            Padding="12"
+                            Background="#FF0F172A"
+                            CornerRadius="6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.TranscriptLines, Mode=OneWay}">
+                                    <ItemsRepeater.ItemTemplate>
+                                        <DataTemplate x:DataType="viewmodels:TranscriptLineViewModel">
+                                            <TextBlock
+                                                Margin="0,0,0,8"
+                                                FontSize="14"
+                                                LineHeight="22"
+                                                Text="{x:Bind DisplayText}"
+                                                TextWrapping="WrapWholeWords" />
+                                        </DataTemplate>
+                                    </ItemsRepeater.ItemTemplate>
+                                </ItemsRepeater>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+
+                    <!-- Empty -->
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.EmptyPanelVisibility, Mode=OneWay}">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            FontSize="32"
+                            Glyph="&#xE8BD;"
+                            Opacity="0.45" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Opacity="0.6"
+                            Text="Transcript will appear here when a file finishes"
+                            TextAlignment="Center" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            FontSize="12"
+                            Opacity="0.5"
+                            Text="Select a completed file in the queue to review it"
+                            TextAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

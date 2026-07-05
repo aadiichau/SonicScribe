@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="LocalScribe.Views.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewmodels="using:LocalScribe.ViewModels"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid Padding="{StaticResource AppPagePadding}" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header + search toolbar -->
+        <StackPanel Grid.Row="0" Spacing="10">
+            <Grid>
+                <StackPanel Spacing="2">
+                    <TextBlock
+                        Style="{StaticResource PageTitleTextBlockStyle}"
+                        Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}" />
+                    <TextBlock
+                        FontSize="14"
+                        Opacity="0.72"
+                        Text="Search and review past transcriptions."
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+                <Button
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Command="{x:Bind ViewModel.RefreshCommand}"
+                    Content="Refresh" />
+            </Grid>
+
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    PlaceholderText="Search transcriptions..."
+                    Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <Button
+                    Grid.Column="1"
+                    VerticalAlignment="Stretch"
+                    Click="ClearHistory_Click"
+                    Content="Clear history"
+                    IsEnabled="{x:Bind ViewModel.CanClearHistory, Mode=OneWay}" />
+            </Grid>
+
+            <TextBlock
+                FontSize="12"
+                Opacity="0.65"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+        </StackPanel>
+
+        <!-- Main content -->
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300" />
+                <ColumnDefinition Width="1.4*" MinWidth="380" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: history list -->
+            <Grid Grid.Column="0" RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SectionHeaderTextBlockStyle}"
+                        Text="PAST TRANSCRIPTIONS" />
+                    <TextBlock
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Opacity="0.75">
+                        <Run Text="{x:Bind ViewModel.ItemCount, Mode=OneWay}" />
+                        <Run Text=" entries" />
+                    </TextBlock>
+                </Grid>
+
+                <Grid Grid.Row="1">
+                    <ListView
+                        x:Name="HistoryList"
+                        ItemsSource="{x:Bind ViewModel.HistoryItems, Mode=OneWay}"
+                        SelectionChanged="HistoryList_SelectionChanged"
+                        SelectionMode="Single">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0,0,0,6" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="viewmodels:HistoryItemViewModel">
+                                <Grid
+                                    Padding="12,10"
+                                    ColumnSpacing="10"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <FontIcon
+                                        VerticalAlignment="Center"
+                                        FontSize="18"
+                                        Glyph="&#xE8D6;" />
+
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind DisplayName}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Opacity="0.65"
+                                            Text="{x:Bind MetaLabel}"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+
+                                    <Border
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Padding="8,4"
+                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                        CornerRadius="12">
+                                        <TextBlock
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind StatusLabel}" />
+                                    </Border>
+
+                                    <Button
+                                        Grid.Column="3"
+                                        VerticalAlignment="Center"
+                                        Click="DeleteItem_Click"
+                                        Content="✕"
+                                        FontSize="12"
+                                        Tag="{x:Bind JobId}"
+                                        ToolTipService.ToolTip="Delete" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <InfoBar
+                        VerticalAlignment="Top"
+                        IsOpen="{x:Bind ViewModel.IsEmpty, Mode=OneWay}"
+                        Message="No transcription history yet. Completed jobs will appear here."
+                        Severity="Informational" />
+                </Grid>
+            </Grid>
+
+            <!-- Right: transcript detail -->
+            <Border Grid.Column="1" Style="{StaticResource PlaceholderCardStyle}">
+                <Grid>
+                    <!-- Loading -->
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12"
+                        Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}">
+                        <ProgressRing IsActive="True" />
+                        <TextBlock Opacity="0.7" Text="Loading transcript..." />
+                    </StackPanel>
+
+                    <!-- Empty -->
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.EmptyDetailVisibility, Mode=OneWay}">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            FontSize="32"
+                            Glyph="&#xE81C;"
+                            Opacity="0.5" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Opacity="0.6"
+                            Text="Select a transcription from the list"
+                            TextAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Transcript -->
+                    <Grid
+                        RowSpacing="12"
+                        Visibility="{x:Bind ViewModel.TranscriptVisibility, Mode=OneWay}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                                    Text="TRANSCRIPT" />
+                                <Button
+                                    HorizontalAlignment="Right"
+                                    Click="RenameButton_Click"
+                                    Content="Rename" />
+                            </Grid>
+                            <TextBlock
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind ViewModel.ViewingFileName, Mode=OneWay}" />
+                            <TextBlock
+                                FontSize="12"
+                                Opacity="0.7"
+                                Text="{x:Bind ViewModel.TranscriptStatsLabel, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ToggleSwitch
+                                    OffContent="Plain text"
+                                    OnContent="Timestamps"
+                                    IsOn="{x:Bind ViewModel.ShowTimestamps, Mode=TwoWay}" />
+                                <Button
+                                    Command="{x:Bind ViewModel.CopyTranscriptCommand}"
+                                    Content="Copy all" />
+                                <Button
+                                    Command="{x:Bind ViewModel.OpenOutputFolderCommand}"
+                                    Content="Open folder" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Command="{x:Bind ViewModel.ExportTxtCommand}" Content="TXT" />
+                                <Button Command="{x:Bind ViewModel.ExportSrtCommand}" Content="SRT" />
+                                <Button Command="{x:Bind ViewModel.ExportVttCommand}" Content="VTT" />
+                                <Button Command="{x:Bind ViewModel.ExportJsonCommand}" Content="JSON" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    Command="{x:Bind ViewModel.OpenTxtFileCommand}"
+                                    Content="Open TXT file" />
+                                <Button
+                                    Command="{x:Bind ViewModel.OpenSrtFileCommand}"
+                                    Content="Open SRT file" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="2"
+                            Padding="12"
+                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                            CornerRadius="8">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.TranscriptLines, Mode=OneWay}">
+                                    <ItemsRepeater.ItemTemplate>
+                                        <DataTemplate x:DataType="viewmodels:TranscriptLineViewModel">
+                                            <TextBlock
+                                                Margin="0,0,0,8"
+                                                FontSize="14"
+                                                LineHeight="22"
+                                                Text="{x:Bind DisplayText}"
+                                                TextWrapping="WrapWholeWords" />
+                                        </DataTemplate>
+                                    </ItemsRepeater.ItemTemplate>
+                                </ItemsRepeater>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

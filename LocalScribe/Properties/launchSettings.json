@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "LocalScribe (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "LocalScribe (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

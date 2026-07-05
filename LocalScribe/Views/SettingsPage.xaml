@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="LocalScribe.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <ScrollViewer>
+        <StackPanel
+            Padding="{StaticResource AppPagePadding}"
+            MaxWidth="760"
+            Spacing="{StaticResource AppSectionSpacing}">
+
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Style="{StaticResource PageTitleTextBlockStyle}"
+                    Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}" />
+                <TextBlock
+                    Style="{StaticResource PageSubtitleTextBlockStyle}"
+                    Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+            </StackPanel>
+
+            <!-- Transcription defaults -->
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="16">
+                    <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="TRANSCRIPTION" />
+
+                    <ComboBox
+                        Header="Whisper model"
+                        HorizontalAlignment="Stretch"
+                        DisplayMemberPath="DisplayName"
+                        ItemsSource="{x:Bind ViewModel.AvailableModels, Mode=OneWay}"
+                        SelectedValue="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
+                        SelectedValuePath="Code" />
+
+                    <ComboBox
+                        Header="Default language"
+                        HorizontalAlignment="Stretch"
+                        DisplayMemberPath="DisplayName"
+                        IsTextSearchEnabled="True"
+                        ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
+                        MaxDropDownHeight="420"
+                        SelectedValue="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}"
+                        SelectedValuePath="Code" />
+
+                    <TextBlock
+                        FontSize="12"
+                        Opacity="0.65"
+                        Text="These defaults apply to newly queued files."
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <!-- Output folder -->
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="16">
+                    <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="OUTPUT" />
+
+                    <TextBox
+                        Header="Output folder"
+                        IsReadOnly="True"
+                        Text="{x:Bind ViewModel.OutputFolder, Mode=OneWay}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            Command="{x:Bind ViewModel.BrowseOutputFolderCommand}"
+                            Content="Browse folder" />
+                        <Button
+                            Command="{x:Bind ViewModel.OpenOutputFolderCommand}"
+                            Content="Open folder" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Python engine -->
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="16">
+                    <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="PYTHON ENGINE" />
+
+                    <TextBox
+                        Header="Python executable"
+                        PlaceholderText="Auto-detected path to python.exe"
+                        Text="{x:Bind ViewModel.PythonPath, Mode=TwoWay}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            Command="{x:Bind ViewModel.BrowsePythonCommand}"
+                            Content="Browse..." />
+                        <Button
+                            Command="{x:Bind ViewModel.AutoDetectPythonCommand}"
+                            Content="Auto-detect" />
+                    </StackPanel>
+
+                    <TextBlock
+                        FontSize="12"
+                        Opacity="0.65"
+                        Text="SonicScribe prefers Python with PyTorch and CUDA support (e.g. Python 3.12)."
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <!-- Device info -->
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource SectionHeaderTextBlockStyle}"
+                            Text="DEVICE" />
+                        <ProgressRing
+                            HorizontalAlignment="Right"
+                            Width="20"
+                            Height="20"
+                            IsActive="{x:Bind ViewModel.IsDetectingDevice, Mode=OneWay}" />
+                    </Grid>
+
+                    <TextBlock
+                        FontSize="20"
+                        FontWeight="SemiBold"
+                        Text="{x:Bind ViewModel.GpuName, Mode=OneWay}" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Opacity="0.85"
+                            Text="{x:Bind ViewModel.DeviceTypeLabel, Mode=OneWay}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Opacity="0.85"
+                            Text="{x:Bind ViewModel.CudaStatusLabel, Mode=OneWay}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Opacity="0.85"
+                            Text="{x:Bind ViewModel.PythonStatusLabel, Mode=OneWay}"
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+
+                    <Button
+                        HorizontalAlignment="Left"
+                        Command="{x:Bind ViewModel.RedetectDeviceCommand}"
+                        Content="Re-detect GPU" />
+                </StackPanel>
+            </Border>
+
+            <!-- Actions -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button
+                    Command="{x:Bind ViewModel.SaveCommand}"
+                    Content="Save settings"
+                    Style="{StaticResource AccentButtonStyle}" />
+                <Button
+                    Command="{x:Bind ViewModel.ResetDefaultsCommand}"
+                    Content="Reset defaults" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
