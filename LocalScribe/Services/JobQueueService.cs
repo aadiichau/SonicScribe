@@ -272,7 +272,6 @@ public sealed class JobQueueService : IJobQueueService
                     {
                         nextJob.Progress = 100;
                         await _historyService.AddOrUpdateAsync(nextJob, cancellationToken);
-                        NotifyJobUpdated(nextJob);
                         _logger.LogInformation("Completed job {JobId}", nextJob.JobId);
                     }
                     else if (result.Status == TranscriptionJobStatus.Cancelled)
@@ -282,6 +281,11 @@ public sealed class JobQueueService : IJobQueueService
                     else
                     {
                         _logger.LogWarning("Job {JobId} finished with status {Status}", nextJob.JobId, result.Status);
+                    }
+
+                    if (result.IsTerminal)
+                    {
+                        NotifyJobUpdated(nextJob);
                     }
                 }
                 catch (OperationCanceledException)

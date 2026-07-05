@@ -77,6 +77,18 @@ public partial class TranscribeViewModel : ObservableObject
     private bool _showEmptyPanel = true;
 
     [ObservableProperty]
+    private bool _showErrorPanel;
+
+    [ObservableProperty]
+    private string _errorPanelMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _showResultPlaceholder;
+
+    [ObservableProperty]
+    private string _resultPlaceholderMessage = string.Empty;
+
+    [ObservableProperty]
     private string _viewingFileName = string.Empty;
 
     [ObservableProperty]
@@ -256,8 +268,7 @@ public partial class TranscribeViewModel : ObservableObject
         else if (jobId is null)
         {
             SelectedQueueItem = null;
-            LoadTranscriptView();
-            UpdateRightPanel();
+            ClearTranscriptView();
         }
         else
         {
@@ -490,17 +501,16 @@ public partial class TranscribeViewModel : ObservableObject
 
         if (job.Status == TranscriptionJobStatus.Done && job.Progress >= 100)
         {
-            _viewingJobId = job.JobId;
-            if (_queueItemLookup.TryGetValue(job.JobId, out var completedItem)
-                && !ReferenceEquals(SelectedQueueItem, completedItem))
-            {
-                SelectedQueueItem = completedItem;
-            }
-
-            _ = ShowCompletedJobAsync(job);
+            SelectTerminalJob(job);
+            _ = LoadTranscriptViewAsync(announceCompletion: true);
         }
         else if (job.Status == TranscriptionJobStatus.Error)
         {
+            SelectTerminalJob(job);
+            CrashLog.WriteMessage(
+                "TranscriptionError",
+                $"Job {job.JobId} ({job.FileName}): {job.ErrorMessage ?? job.LogMessage}");
+            _ = LoadTranscriptViewAsync();
             SetStatus(job.ErrorMessage ?? job.LogMessage, AppMessageSeverity.Error);
         }
         else if (job.Status == TranscriptionJobStatus.Cancelled)
@@ -537,7 +547,12 @@ public partial class TranscribeViewModel : ObservableObject
             ActiveFileName = string.Empty;
         }
 
-        if (activeJob is null && !IsQueueEmpty && !IsProcessing && !ShowTranscriptPanel)
+        if (activeJob is null
+            && !IsQueueEmpty
+            && !IsProcessing
+            && !ShowTranscriptPanel
+            && !ShowErrorPanel
+            && _jobQueueService.Queue.All(job => job.Status == TranscriptionJobStatus.Queued))
         {
             SetStatus("Queue ready. Add more files or press Start.");
         }
@@ -574,8 +589,7 @@ public partial class TranscribeViewModel : ObservableObject
             {
                 if (_viewingJobId == QueueItems[index].JobId)
                 {
-                    _viewingJobId = null;
-                    LoadTranscriptView();
+                    ClearTranscriptView();
                 }
 
                 _queueItemLookup.Remove(QueueItems[index].JobId);
@@ -631,62 +645,99 @@ public partial class TranscribeViewModel : ObservableObject
     {
         _viewingJobId = null;
         SelectedQueueItem = null;
+        ClearResultPanels();
+        UpdateRightPanel();
+        NotifyCommandStates();
+    }
+
+    private void ClearResultPanels()
+    {
         TranscriptLines.Clear();
         ViewingFileName = string.Empty;
         TranscriptStatsLabel = string.Empty;
-        UpdateRightPanel();
-        NotifyCommandStates();
+        ShowErrorPanel = false;
+        ErrorPanelMessage = string.Empty;
+        ShowResultPlaceholder = false;
+        ResultPlaceholderMessage = string.Empty;
     }
 
-    private void LoadTranscriptView()
+    private void SelectTerminalJob(TranscriptionJob job)
     {
-        TranscriptLines.Clear();
+        _viewingJobId = job.JobId;
+        if (_queueItemLookup.TryGetValue(job.JobId, out var item)
+            && !ReferenceEquals(SelectedQueueItem, item))
+        {
+            SelectedQueueItem = item;
+        }
+    }
+
+    private async Task LoadTranscriptViewAsync(bool announceCompletion = false)
+    {
+        var jobId = _viewingJobId;
         var job = GetViewingJob();
 
-        if (job is null)
+        if (job is not null && job.Status == TranscriptionJobStatus.Done)
         {
-            ViewingFileName = string.Empty;
-            TranscriptStatsLabel = string.Empty;
-            return;
+            await EnsureSegmentsLoadedAsync(job).ConfigureAwait(false);
         }
 
-        if (job.Segments.Count == 0)
+        UiDispatcher.Invoke(() =>
         {
-            if (job.Status != TranscriptionJobStatus.Done)
+            if (!string.Equals(_viewingJobId, jobId, StringComparison.OrdinalIgnoreCase))
             {
-                ViewingFileName = string.Empty;
-                TranscriptStatsLabel = string.Empty;
                 return;
             }
 
+            var currentJob = GetViewingJob();
+            if (currentJob is null)
+            {
+                ClearResultPanels();
+            }
+            else
+            {
+                ApplyJobResultToPanel(currentJob);
+            }
+
+            UpdateRightPanel();
+            NotifyCommandStates();
+
+            if (announceCompletion && currentJob?.Status == TranscriptionJobStatus.Done)
+            {
+                SetStatus($"Finished {currentJob.DisplayName}.", AppMessageSeverity.Success);
+            }
+        });
+    }
+
+    private void ApplyJobResultToPanel(TranscriptionJob job)
+    {
+        ClearResultPanels();
+
+        if (job.Status == TranscriptionJobStatus.Error)
+        {
             ViewingFileName = job.DisplayName;
-            TranscriptStatsLabel = BuildStatsLabel(job);
+            ErrorPanelMessage = string.IsNullOrWhiteSpace(job.ErrorMessage)
+                ? job.LogMessage
+                : job.ErrorMessage;
+            ShowErrorPanel = true;
             return;
         }
 
-        PopulateTranscriptLines(job);
-    }
-
-    private async Task LoadTranscriptViewAsync()
-    {
-        var job = GetViewingJob();
-        if (job is not null)
+        if (job.Status != TranscriptionJobStatus.Done)
         {
-            await EnsureSegmentsLoadedAsync(job);
+            return;
         }
 
-        LoadTranscriptView();
-        UpdateRightPanel();
-        NotifyCommandStates();
-    }
+        ViewingFileName = job.DisplayName;
+        TranscriptStatsLabel = BuildStatsLabel(job);
 
-    private async Task ShowCompletedJobAsync(TranscriptionJob job)
-    {
-        await EnsureSegmentsLoadedAsync(job);
-        LoadTranscriptView();
-        UpdateRightPanel();
-        NotifyCommandStates();
-        SetStatus($"Finished {job.DisplayName}.", AppMessageSeverity.Success);
+        if (job.Segments.Count > 0)
+        {
+            PopulateTranscriptLines(job);
+            return;
+        }
+
+        ShowResultPlaceholder = true;
+        ResultPlaceholderMessage = "Transcription finished, but no speech was detected in this file.";
     }
 
     private async Task EnsureSegmentsLoadedAsync(TranscriptionJob job)
@@ -729,20 +780,26 @@ public partial class TranscribeViewModel : ObservableObject
                 or TranscriptionJobStatus.Exporting
                 or TranscriptionJobStatus.Paused;
 
-        var hasTranscriptContent = viewingJob is not null
-            && (viewingJob.Segments.Count > 0 || TranscriptLines.Count > 0);
+        var showTranscript = viewingJob?.Status == TranscriptionJobStatus.Done
+            && (viewingJob.Segments.Count > 0
+                || TranscriptLines.Count > 0
+                || ShowResultPlaceholder)
+            && (!activeIsProcessing || _viewingJobId != activeJob?.JobId);
 
-        var showTranscript = hasTranscriptContent
-            && viewingJob!.Status == TranscriptionJobStatus.Done
+        var showError = viewingJob?.Status == TranscriptionJobStatus.Error
+            && ShowErrorPanel
             && (!activeIsProcessing || _viewingJobId != activeJob?.JobId);
 
         ShowTranscriptPanel = showTranscript;
-        ShowProgressPanel = activeIsProcessing && !showTranscript;
-        ShowEmptyPanel = !ShowTranscriptPanel && !ShowProgressPanel;
+        ShowErrorPanel = showError;
+        ShowProgressPanel = activeIsProcessing && !showTranscript && !showError;
+        ShowEmptyPanel = !ShowTranscriptPanel && !ShowErrorPanel && !ShowProgressPanel;
 
         OnPropertyChanged(nameof(ProgressPanelVisibility));
         OnPropertyChanged(nameof(TranscriptPanelVisibility));
+        OnPropertyChanged(nameof(ErrorPanelVisibility));
         OnPropertyChanged(nameof(EmptyPanelVisibility));
+        OnPropertyChanged(nameof(ResultPlaceholderVisibility));
     }
 
     private TranscriptionJob? GetViewingJob()
@@ -840,7 +897,21 @@ public partial class TranscribeViewModel : ObservableObject
 
     public Visibility TranscriptPanelVisibility => ShowTranscriptPanel ? Visibility.Visible : Visibility.Collapsed;
 
+    public Visibility ErrorPanelVisibility => ShowErrorPanel ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ResultPlaceholderVisibility =>
+        ShowResultPlaceholder ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility TranscriptLinesVisibility =>
+        ShowResultPlaceholder ? Visibility.Collapsed : Visibility.Visible;
+
     public Visibility EmptyPanelVisibility => ShowEmptyPanel ? Visibility.Visible : Visibility.Collapsed;
+
+    partial void OnShowResultPlaceholderChanged(bool value)
+    {
+        OnPropertyChanged(nameof(TranscriptLinesVisibility));
+        OnPropertyChanged(nameof(ResultPlaceholderVisibility));
+    }
 
     public Visibility SetupBannerVisibility =>
         !IsTranscriptionReady ? Visibility.Visible : Visibility.Collapsed;

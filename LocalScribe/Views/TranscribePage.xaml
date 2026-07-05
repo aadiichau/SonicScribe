@@ -338,22 +338,61 @@
                             Padding="12"
                             Background="#FF0F172A"
                             CornerRadius="6">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.TranscriptLines, Mode=OneWay}">
-                                    <ItemsRepeater.ItemTemplate>
-                                        <DataTemplate x:DataType="viewmodels:TranscriptLineViewModel">
-                                            <TextBlock
-                                                Margin="0,0,0,8"
-                                                FontSize="14"
-                                                LineHeight="22"
-                                                Text="{x:Bind DisplayText}"
-                                                TextWrapping="WrapWholeWords" />
-                                        </DataTemplate>
-                                    </ItemsRepeater.ItemTemplate>
-                                </ItemsRepeater>
-                            </ScrollViewer>
+                            <Grid>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="14"
+                                    Opacity="0.75"
+                                    Text="{x:Bind ViewModel.ResultPlaceholderMessage, Mode=OneWay}"
+                                    TextAlignment="Center"
+                                    TextWrapping="WrapWholeWords"
+                                    Visibility="{x:Bind ViewModel.ResultPlaceholderVisibility, Mode=OneWay}" />
+                                <ScrollViewer
+                                    VerticalScrollBarVisibility="Auto"
+                                    Visibility="{x:Bind ViewModel.TranscriptLinesVisibility, Mode=OneWay}">
+                                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.TranscriptLines, Mode=OneWay}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate x:DataType="viewmodels:TranscriptLineViewModel">
+                                                <TextBlock
+                                                    Margin="0,0,0,8"
+                                                    FontSize="14"
+                                                    LineHeight="22"
+                                                    Text="{x:Bind DisplayText}"
+                                                    TextWrapping="WrapWholeWords" />
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </ScrollViewer>
+                            </Grid>
                         </Border>
                     </Grid>
+
+                    <!-- Error -->
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.ErrorPanelVisibility, Mode=OneWay}">
+                        <TextBlock
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Foreground="#FFFCA5A5"
+                            Opacity="0.9"
+                            Text="TRANSCRIPTION FAILED" />
+                        <TextBlock
+                            FontSize="16"
+                            FontWeight="SemiBold"
+                            Text="{x:Bind ViewModel.ViewingFileName, Mode=OneWay}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="13"
+                            Foreground="#FFFCA5A5"
+                            Text="{x:Bind ViewModel.ErrorPanelMessage, Mode=OneWay}"
+                            TextWrapping="WrapWholeWords" />
+                        <TextBlock
+                            FontSize="12"
+                            Opacity="0.65"
+                            Text="Check that the file still exists, then try again. View logs in %LocalAppData%\SonicScribe\logs\crash.log"
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
 
                     <!-- Empty -->
                     <StackPanel
