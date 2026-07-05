@@ -42,7 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<AboutViewModel>();
 
-        services.AddTransient<MainWindow>();
+        services.AddSingleton<MainWindow>();
         services.AddTransient<ShellPage>();
         services.AddTransient<TranscribePage>();
         services.AddTransient<HistoryPage>();

@@ -79,7 +79,7 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
             Percent = 0
         });
 
-        await DownloadFileAsync(downloadUrl, installerPath, progress, cancellationToken);
+        await DownloadFileAsync(downloadUrl, installerPath, progress, cancellationToken).ConfigureAwait(false);
 
         progress?.Report(new AppUpdateProgress
         {
@@ -135,7 +135,7 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
             Percent = 0
         });
 
-        await DownloadFileAsync(downloadUrl, zipPath, progress, cancellationToken);
+        await DownloadFileAsync(downloadUrl, zipPath, progress, cancellationToken).ConfigureAwait(false);
 
         progress?.Report(new AppUpdateProgress
         {
@@ -199,9 +199,10 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
         long downloaded = 0;
         int read;
 
-        while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        while ((read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             downloaded += read;
 
             if (totalBytes is > 0)

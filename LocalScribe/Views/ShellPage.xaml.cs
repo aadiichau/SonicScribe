@@ -13,6 +13,7 @@ public sealed partial class ShellPage : Page
     private readonly INavigationService _navigationService;
     private readonly IFilePickerService _filePickerService;
     private readonly IJobQueueService _jobQueueService;
+    private bool _isRestoringSelection;
 
     public ShellViewModel ViewModel { get; }
 
@@ -33,38 +34,78 @@ public sealed partial class ShellPage : Page
     {
         AppLogoImage.Source = AssetPathHelper.CreateBitmap("Assets/StoreLogo.png", decodePixelWidth: 112);
 
-        if (NavView.MenuItems.Count > 0)
-        {
-            NavView.SelectedItem = NavView.MenuItems[0];
-        }
-
         if (ContentFrame.Content is null)
         {
             _navigationService.Navigate(NavigationTag.Transcribe);
         }
 
+        SyncNavSelection(_navigationService.CurrentTag ?? NavigationTag.Transcribe);
         await ViewModel.InitializeAsync();
     }
 
-    private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    private void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (args.SelectedItem is not NavigationViewItem item || item.Tag is not string tag)
+        if (args.IsSettingsInvoked || _isRestoringSelection)
         {
             return;
         }
 
+        if (args.InvokedItemContainer is NavigationViewItem { Tag: string tag })
+        {
+            NavigateToTag(tag);
+        }
+    }
+
+    private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (_isRestoringSelection)
+        {
+            return;
+        }
+
+        if (args.SelectedItem is NavigationViewItem { Tag: string tag })
+        {
+            NavigateToTag(tag);
+        }
+    }
+
+    private void NavigateToTag(string tag)
+    {
         ViewModel.SelectedNavigationTag = tag;
-        _navigationService.Navigate(tag);
+
+        if (_navigationService.Navigate(tag))
+        {
+            return;
+        }
+
+        SyncNavSelection(_navigationService.CurrentTag ?? NavigationTag.Transcribe);
+    }
+
+    private void SyncNavSelection(string? tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return;
+        }
+
+        foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
+        {
+            if (!string.Equals(item.Tag as string, tag, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            _isRestoringSelection = true;
+            NavView.SelectedItem = item;
+            _isRestoringSelection = false;
+            ViewModel.SelectedNavigationTag = tag;
+            return;
+        }
     }
 
     private async void PaneAddFiles_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        if (NavView.MenuItems[0] is NavigationViewItem transcribeItem)
-        {
-            NavView.SelectedItem = transcribeItem;
-        }
-
-        _navigationService.Navigate(NavigationTag.Transcribe);
+        NavigateToTag(NavigationTag.Transcribe);
 
         var paths = await _filePickerService.PickMediaFilesAsync();
         if (paths.Count == 0)

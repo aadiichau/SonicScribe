@@ -1,3 +1,4 @@
+using LocalScribe.Helpers;
 using LocalScribe.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -7,21 +8,30 @@ namespace LocalScribe.Services;
 public sealed class UpdatePromptService
 {
     private readonly IAppUpdateService _appUpdateService;
+    private readonly IWindowHandleProvider _windowContext;
 
-    public UpdatePromptService(IAppUpdateService appUpdateService)
+    public UpdatePromptService(
+        IAppUpdateService appUpdateService,
+        IWindowHandleProvider windowContext)
     {
         _appUpdateService = appUpdateService;
+        _windowContext = windowContext;
     }
 
-    public Task<bool> PromptAndApplyAsync(Window window, UpdateCheckResult result) =>
-        ApplyUpdateAsync(window, result);
+    public Task<bool> PromptAndApplyAsync(UpdateCheckResult result, CancellationToken cancellationToken = default) =>
+        ApplyUpdateAsync(result, cancellationToken);
 
-    public async Task<bool> ApplyUpdateAsync(Window window, UpdateCheckResult result)
+    public async Task<bool> ApplyUpdateAsync(
+        UpdateCheckResult result,
+        CancellationToken cancellationToken = default)
     {
-        if (window.Content?.XamlRoot is null || !result.IsUpdateAvailable)
+        var xamlRoot = _windowContext.XamlRoot;
+        if (xamlRoot is null || !result.IsUpdateAvailable)
         {
             return false;
         }
+
+        using var dialogCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var progressBar = new ProgressBar
         {
@@ -44,12 +54,15 @@ public sealed class UpdatePromptService
         {
             Title = "Updating SonicScribe",
             Content = progressPanel,
-            XamlRoot = window.Content.XamlRoot
+            CloseButtonText = "Cancel",
+            XamlRoot = xamlRoot
         };
+
+        progressDialog.CloseButtonClick += (_, _) => dialogCts.Cancel();
 
         var progress = new Progress<AppUpdateProgress>(update =>
         {
-            window.DispatcherQueue.TryEnqueue(() =>
+            UiDispatcher.Invoke(() =>
             {
                 statusText.Text = update.Message;
                 if (update.Percent is >= 0 and <= 100)
@@ -64,9 +77,18 @@ public sealed class UpdatePromptService
             });
         });
 
-        var applyTask = _appUpdateService.DownloadAndApplyAsync(result, progress);
+        var applyTask = _appUpdateService.DownloadAndApplyAsync(result, progress, dialogCts.Token);
         var dialogTask = progressDialog.ShowAsync();
-        var applyResult = await applyTask;
+        AppUpdateResult applyResult;
+
+        try
+        {
+            applyResult = await applyTask;
+        }
+        catch (OperationCanceledException)
+        {
+            applyResult = new AppUpdateResult { ErrorMessage = "Update cancelled." };
+        }
 
         try
         {
@@ -88,12 +110,17 @@ public sealed class UpdatePromptService
 
         if (!applyResult.Success)
         {
+            if (applyResult.ErrorMessage is "Update cancelled.")
+            {
+                return false;
+            }
+
             var errorDialog = new ContentDialog
             {
                 Title = "Update failed",
                 Content = applyResult.ErrorMessage ?? "The update could not be completed.",
                 CloseButtonText = "Close",
-                XamlRoot = window.Content.XamlRoot
+                XamlRoot = xamlRoot
             };
             await errorDialog.ShowAsync();
             return false;

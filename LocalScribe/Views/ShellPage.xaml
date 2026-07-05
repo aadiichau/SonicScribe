@@ -22,6 +22,7 @@
     <Grid>
         <NavigationView
             x:Name="NavView"
+            ItemInvoked="NavView_ItemInvoked"
             SelectionChanged="NavView_SelectionChanged"
             Loaded="ShellPage_Loaded">
 

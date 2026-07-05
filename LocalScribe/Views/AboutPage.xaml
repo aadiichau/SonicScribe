@@ -102,7 +102,7 @@
                     <TextBlock
                         FontSize="12"
                         Opacity="0.65"
-                        Text="SonicScribe downloads updates from GitHub. Run the new installer to update — your settings are kept."
+                        Text="Tap Update now to download and install inside the app, then restart automatically. Your settings are kept."
                         TextWrapping="WrapWholeWords" />
                 </StackPanel>
             </Border>

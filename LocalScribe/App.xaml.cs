@@ -94,7 +94,7 @@ public partial class App : Application
         var dialogResult = await dialog.ShowAsync();
         if (dialogResult == ContentDialogResult.Primary)
         {
-            await updatePromptService.ApplyUpdateAsync(mainWindow, result);
+            await updatePromptService.ApplyUpdateAsync(result);
             return;
         }
 

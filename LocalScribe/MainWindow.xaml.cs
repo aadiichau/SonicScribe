@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
 
         var shellPage = App.Services.GetRequiredService<ShellPage>();
         RootFrame.Content = shellPage;
+        windowHandleProvider.XamlRoot = RootFrame.XamlRoot;
 
         Closed += OnWindowClosed;
     }

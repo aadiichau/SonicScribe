@@ -3,13 +3,13 @@ using CommunityToolkit.Mvvm.Input;
 using LocalScribe.Core;
 using LocalScribe.Models;
 using LocalScribe.Services;
+
 namespace LocalScribe.ViewModels;
 
 public partial class AboutViewModel : ObservableObject
 {
     private readonly IUpdateCheckService _updateCheckService;
     private readonly UpdatePromptService _updatePromptService;
-    private readonly LocalScribe.MainWindow _mainWindow;
     private UpdateCheckResult? _lastUpdateResult;
 
     [ObservableProperty]
@@ -27,14 +27,15 @@ public partial class AboutViewModel : ObservableObject
     [ObservableProperty]
     private bool _isUpdateAvailable;
 
+    [ObservableProperty]
+    private bool _isApplyingUpdate;
+
     public AboutViewModel(
         IUpdateCheckService updateCheckService,
-        UpdatePromptService updatePromptService,
-        LocalScribe.MainWindow mainWindow)
+        UpdatePromptService updatePromptService)
     {
         _updateCheckService = updateCheckService;
         _updatePromptService = updatePromptService;
-        _mainWindow = mainWindow;
     }
 
     public string AppName => AppBranding.AppName;
@@ -82,15 +83,27 @@ public partial class AboutViewModel : ObservableObject
             return;
         }
 
+        IsApplyingUpdate = true;
         UpdateStatusMessage = "Downloading and installing update...";
-        var applied = await _updatePromptService.ApplyUpdateAsync(_mainWindow, _lastUpdateResult);
-        if (!applied)
+
+        try
         {
-            UpdateStatusMessage = $"Update available: v{_lastUpdateResult.LatestVersion} (you have v{_lastUpdateResult.CurrentVersion}).";
+            var applied = await _updatePromptService.ApplyUpdateAsync(_lastUpdateResult);
+            if (!applied)
+            {
+                UpdateStatusMessage =
+                    $"Update available: v{_lastUpdateResult.LatestVersion} (you have v{_lastUpdateResult.CurrentVersion}).";
+            }
+        }
+        finally
+        {
+            IsApplyingUpdate = false;
+            DownloadUpdateCommand.NotifyCanExecuteChanged();
         }
     }
 
-    private bool CanDownloadUpdate() => IsUpdateAvailable && !IsCheckingForUpdates;
+    private bool CanDownloadUpdate() =>
+        IsUpdateAvailable && !IsCheckingForUpdates && !IsApplyingUpdate;
 
     private async Task RefreshUpdateStatusAsync(bool forceRefresh)
     {
@@ -120,5 +133,8 @@ public partial class AboutViewModel : ObservableObject
     }
 
     partial void OnIsUpdateAvailableChanged(bool value) =>
+        DownloadUpdateCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsApplyingUpdateChanged(bool value) =>
         DownloadUpdateCommand.NotifyCanExecuteChanged();
 }

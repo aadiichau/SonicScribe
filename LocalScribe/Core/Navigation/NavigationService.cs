@@ -1,6 +1,8 @@
+using LocalScribe.Helpers;
 using LocalScribe.Views;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
 
 namespace LocalScribe.Core.Navigation;
 
@@ -8,9 +10,12 @@ public sealed class NavigationService : INavigationService
 {
     private Frame? _frame;
 
+    public string? CurrentTag { get; private set; }
+
     public void Attach(Frame frame)
     {
         _frame = frame;
+        _frame.Navigated += OnFrameNavigated;
     }
 
     public bool Navigate(string tag, object? parameter = null)
@@ -34,7 +39,31 @@ public sealed class NavigationService : INavigationService
             return false;
         }
 
-        return _frame.Navigate(pageType, parameter, new EntranceNavigationTransitionInfo());
+        if (_frame.Content?.GetType() == pageType)
+        {
+            CurrentTag = tag;
+            return true;
+        }
+
+        try
+        {
+            var success = _frame.Navigate(
+                pageType,
+                parameter,
+                new SuppressNavigationTransitionInfo());
+
+            if (success)
+            {
+                CurrentTag = tag;
+            }
+
+            return success;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("Navigation", ex);
+            return false;
+        }
     }
 
     public bool GoBack()
@@ -46,5 +75,17 @@ public sealed class NavigationService : INavigationService
 
         _frame.GoBack();
         return true;
+    }
+
+    private void OnFrameNavigated(object sender, NavigationEventArgs e)
+    {
+        CurrentTag = e.SourcePageType switch
+        {
+            var type when type == typeof(TranscribePage) => NavigationTag.Transcribe,
+            var type when type == typeof(HistoryPage) => NavigationTag.History,
+            var type when type == typeof(SettingsPage) => NavigationTag.Settings,
+            var type when type == typeof(AboutPage) => NavigationTag.About,
+            _ => CurrentTag
+        };
     }
 }
