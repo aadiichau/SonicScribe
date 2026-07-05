@@ -35,8 +35,8 @@
 
 | Package | Description |
 |---------|-------------|
-| [**Installer (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-Setup-v1.0.2.exe) | `SonicScribe-Setup-v1.0.2.exe` — install like a normal Windows app |
-| [**Portable zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.2-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe` (no install) |
+| [**Installer (recommended)**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-Setup-v1.0.3.exe) | `SonicScribe-Setup-v1.0.3.exe` — install like a normal Windows app |
+| [**Portable zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-v1.0.3-Portable-win-x64.zip) | Unzip anywhere → run `SonicScribe.exe` (no install) |
 
 | | |
 |---|---|
@@ -45,7 +45,7 @@
 
 ### Install with the setup exe (recommended)
 
-1. Download **`SonicScribe-Setup-v1.0.2.exe`**
+1. Download **`SonicScribe-Setup-v1.0.3.exe`**
 2. Run the installer → Next → Install
 3. Launch from Start Menu (optional desktop shortcut)
 4. Install Python prerequisites (below) on first use
@@ -176,7 +176,7 @@ Everything stays on your computer. No telemetry, no cloud API calls for transcri
 
 ### App won't open / nothing happens when I double-click
 
-1. **Download v1.0.2 or later** — older builds required the Windows App Runtime to be installed separately. v1.0.1+ bundles it.
+1. **Download v1.0.3 or later** — older builds required the Windows App Runtime to be installed separately. v1.0.1+ bundles it.
 2. **Use the installer or keep the portable folder intact** — do not move `SonicScribe.exe` out of its folder; it needs the DLLs beside it.
 3. **Check crash logs** — if startup fails, open `%LOCALAPPDATA%\SonicScribe\logs\crash.log`.
 4. **Requirements** — 64-bit Windows 10 (1809+) or Windows 11. 32-bit Windows is not supported.

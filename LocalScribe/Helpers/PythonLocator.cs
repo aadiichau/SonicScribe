@@ -9,6 +9,58 @@ public static class PythonLocator
         "py"
     ];
 
+    public static async Task<string?> LocateSupportedAsync(
+        string? preferredPath = null,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(preferredPath))
+        {
+            candidates.Add(preferredPath);
+        }
+
+        candidates.AddRange(GetCommonInstallPaths().Where(path => !path.Contains("Python313", StringComparison.OrdinalIgnoreCase)));
+
+        foreach (var version in new[] { "3.12", "3.11" })
+        {
+            var resolved = await TryResolvePyLauncherAsync(version, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                candidates.Add(resolved);
+            }
+        }
+
+        foreach (var command in CandidateCommands)
+        {
+            var resolved = await TryResolveAsync(command, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                candidates.Add(resolved);
+            }
+        }
+
+        var distinctCandidates = candidates
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var candidate in distinctCandidates)
+        {
+            if (!File.Exists(candidate) || !await CanExecuteAsync(candidate, cancellationToken))
+            {
+                continue;
+            }
+
+            if (await IsSupportedVersionAsync(candidate, cancellationToken))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     public static async Task<string?> LocateAsync(string? preferredPath = null, CancellationToken cancellationToken = default)
     {
         var candidates = new List<string>();
@@ -67,6 +119,46 @@ public static class PythonLocator
         yield return Path.Combine(localAppData, "Programs", "Python", "Python312", "python.exe");
         yield return Path.Combine(localAppData, "Programs", "Python", "Python313", "python.exe");
         yield return Path.Combine(localAppData, "Programs", "Python", "Python311", "python.exe");
+    }
+
+    private static async Task<bool> IsSupportedVersionAsync(string executable, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await ProcessRunner.RunAsync(
+                executable,
+                "-c \"import sys; v=sys.version_info; print(1 if v.major==3 and v.minor in (11,12) else 0)\"",
+                cancellationToken);
+
+            return result.ExitCode == 0 && result.StandardOutput.Trim() == "1";
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task<string?> TryResolvePyLauncherAsync(string version, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await ProcessRunner.RunAsync(
+                "py",
+                $"-{version} -c \"import sys; print(sys.executable)\"",
+                cancellationToken);
+
+            if (result.ExitCode != 0)
+            {
+                return null;
+            }
+
+            var executable = result.StandardOutput.Trim();
+            return string.IsNullOrWhiteSpace(executable) ? null : executable;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static async Task<string?> TryResolveAsync(string command, CancellationToken cancellationToken)

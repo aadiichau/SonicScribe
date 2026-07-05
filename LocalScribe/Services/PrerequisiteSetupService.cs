@@ -27,10 +27,7 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
     public async Task<PrerequisiteReport> CheckAsync(CancellationToken cancellationToken = default)
     {
         var wingetAvailable = await IsWingetAvailableAsync(cancellationToken);
-        var pythonPath = await PythonLocator.LocateAsync(
-            _settingsService.Current.PythonExecutablePath,
-            cancellationToken);
-
+        var pythonPath = await ResolvePythonPathAsync(cancellationToken);
         var pythonVersion = pythonPath is null
             ? null
             : await GetPythonVersionAsync(pythonPath, cancellationToken);
@@ -108,19 +105,18 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
                 LogLine = logLine
             });
 
-        var initial = await CheckAsync(cancellationToken);
-        if (initial.AllReady)
+        var report = await CheckAsync(cancellationToken);
+        if (report.IsTranscriptionReady && report.Items.First(item => item.Kind == PrerequisiteKind.Ffmpeg).IsReady)
         {
             Report("Done", "Everything is already installed.");
-            return initial;
+            return report;
         }
 
-        var pythonPath = initial.PythonPath;
-        var pythonItem = initial.Items.First(item => item.Kind == PrerequisiteKind.Python);
-        var ffmpegItem = initial.Items.First(item => item.Kind == PrerequisiteKind.Ffmpeg);
+        var pythonItem = report.Items.First(item => item.Kind == PrerequisiteKind.Python);
+        var ffmpegItem = report.Items.First(item => item.Kind == PrerequisiteKind.Ffmpeg);
         var needsWinget = !pythonItem.IsReady || !ffmpegItem.IsReady;
 
-        if (needsWinget && !initial.IsWingetAvailable)
+        if (needsWinget && !report.IsWingetAvailable)
         {
             throw new InvalidOperationException(
                 "Windows Package Manager (winget) is required for automatic setup. " +
@@ -131,86 +127,161 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
         {
             Report("Python", "Installing Python 3.12 (this may take a few minutes)...");
             await InstallWithWingetAsync(PythonWingetId, Report, cancellationToken);
-
-            for (var attempt = 0; attempt < 6; attempt++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-                pythonPath = await PythonLocator.LocateAsync(cancellationToken: cancellationToken);
-                var version = pythonPath is null ? null : await GetPythonVersionAsync(pythonPath, cancellationToken);
-                if (pythonPath is not null && IsSupportedPythonVersion(version))
-                {
-                    break;
-                }
-            }
-
-            if (pythonPath is null || !IsSupportedPythonVersion(await GetPythonVersionAsync(pythonPath, cancellationToken)))
-            {
-                throw new InvalidOperationException(
-                    "Python was installed but SonicScribe could not find Python 3.11 or 3.12. Restart the app and try again.");
-            }
-
-            _settingsService.Current.PythonExecutablePath = pythonPath;
-            await _settingsService.SaveAsync(cancellationToken);
-            Report("Python", $"Python ready at {pythonPath}");
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
         }
 
-        pythonPath ??= (await CheckAsync(cancellationToken)).PythonPath;
-        if (pythonPath is null)
+        var pythonPath = await WaitForSupportedPythonAsync(Report, cancellationToken);
+        _settingsService.Current.PythonExecutablePath = pythonPath;
+        await _settingsService.SaveAsync(cancellationToken);
+        Report("Python", $"Using Python at {pythonPath}");
+
+        Report("Packages", "Preparing pip...");
+        await EnsurePipReadyAsync(pythonPath, Report, cancellationToken);
+
+        report = await CheckAsync(cancellationToken);
+        if (!report.Items.First(item => item.Kind == PrerequisiteKind.FasterWhisper).IsReady)
         {
-            throw new InvalidOperationException("Python is required before installing transcription packages.");
+            Report("Packages", "Installing faster-whisper...");
+            await RunPythonPipAsync(
+                pythonPath,
+                "-m pip install faster-whisper",
+                Report,
+                cancellationToken,
+                timeoutMs: 600_000);
         }
 
-        var needsPackages = !initial.Items.First(item => item.Kind == PrerequisiteKind.FasterWhisper).IsReady
-            || !initial.Items.First(item => item.Kind == PrerequisiteKind.PyTorch).IsReady;
-
-        if (needsPackages)
+        report = await CheckAsync(cancellationToken);
+        if (!report.Items.First(item => item.Kind == PrerequisiteKind.PyTorch).IsReady)
         {
             var useCuda = await HasNvidiaGpuAsync(cancellationToken);
-            Report("Packages", useCuda
-                ? "Installing faster-whisper and PyTorch with NVIDIA GPU support (large download, be patient)..."
-                : "Installing faster-whisper and PyTorch for CPU (large download, be patient)...");
-
-            await RunPythonPipAsync(
-                pythonPath,
-                "-m pip install --upgrade pip",
-                Report,
-                cancellationToken,
-                timeoutMs: 300_000);
-
-            var pipArgs = useCuda
-                ? $"install faster-whisper torch torchvision torchaudio --index-url {CudaPipIndex}"
-                : "install faster-whisper torch torchvision torchaudio";
-
-            await RunPythonPipAsync(
-                pythonPath,
-                $"-m pip {pipArgs}",
-                Report,
-                cancellationToken,
-                timeoutMs: 1_800_000);
+            if (useCuda)
+            {
+                Report("Packages", "Installing PyTorch with NVIDIA GPU support (large download)...");
+                try
+                {
+                    await RunPythonPipAsync(
+                        pythonPath,
+                        $"-m pip install torch torchvision torchaudio --index-url {CudaPipIndex}",
+                        Report,
+                        cancellationToken,
+                        timeoutMs: 1_800_000);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "CUDA PyTorch install failed. Falling back to CPU build.");
+                    Report("Packages", "GPU install failed. Installing CPU PyTorch instead...");
+                    await RunPythonPipAsync(
+                        pythonPath,
+                        "-m pip install torch torchvision torchaudio",
+                        Report,
+                        cancellationToken,
+                        timeoutMs: 1_800_000);
+                }
+            }
+            else
+            {
+                Report("Packages", "Installing PyTorch for CPU (large download)...");
+                await RunPythonPipAsync(
+                    pythonPath,
+                    "-m pip install torch torchvision torchaudio",
+                    Report,
+                    cancellationToken,
+                    timeoutMs: 1_800_000);
+            }
         }
 
-        if (!ffmpegItem.IsReady)
+        report = await CheckAsync(cancellationToken);
+        if (!report.Items.First(item => item.Kind == PrerequisiteKind.Ffmpeg).IsReady)
         {
-            Report("FFmpeg", "Installing FFmpeg for video support...");
-            await InstallWithWingetAsync(FfmpegWingetId, Report, cancellationToken);
+            try
+            {
+                Report("FFmpeg", "Installing FFmpeg for video support...");
+                await InstallWithWingetAsync(FfmpegWingetId, Report, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "FFmpeg install failed. Continuing without FFmpeg.");
+                Report("FFmpeg", "FFmpeg install failed (optional). Video files may not work until FFmpeg is installed.");
+            }
         }
 
         _deviceDetectionService.InvalidateCache();
         await _deviceDetectionService.DetectAsync(forceRefresh: true, cancellationToken: cancellationToken);
 
         var final = await CheckAsync(cancellationToken);
-        if (!final.Items.First(item => item.Kind == PrerequisiteKind.Python).IsReady
-            || !final.Items.First(item => item.Kind == PrerequisiteKind.FasterWhisper).IsReady
-            || !final.Items.First(item => item.Kind == PrerequisiteKind.PyTorch).IsReady)
+        if (!final.IsTranscriptionReady)
         {
+            var missing = string.Join(
+                ", ",
+                final.MissingItems
+                    .Where(item => item.Kind is PrerequisiteKind.Python or PrerequisiteKind.FasterWhisper or PrerequisiteKind.PyTorch)
+                    .Select(item => item.Name));
+
             throw new InvalidOperationException(
-                "Automatic setup finished but some required components are still missing. " +
-                "Check Settings → Setup for details.");
+                $"Automatic setup could not finish. Still missing: {missing}. Try again or check Settings.");
         }
 
         Report("Done", "Setup complete! You can start transcribing.");
         return final;
+    }
+
+    private async Task<string> WaitForSupportedPythonAsync(
+        Action<string, string, string?> report,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var pythonPath = await ResolvePythonPathAsync(cancellationToken);
+            if (pythonPath is not null)
+            {
+                return pythonPath;
+            }
+
+            report("Python", $"Waiting for Python to finish installing ({attempt + 1}/12)...", null);
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            "Python 3.11 or 3.12 was not found after install. Restart SonicScribe and tap Install everything again.");
+    }
+
+    private async Task<string?> ResolvePythonPathAsync(CancellationToken cancellationToken)
+    {
+        return await PythonLocator.LocateSupportedAsync(
+            _settingsService.Current.PythonExecutablePath,
+            cancellationToken);
+    }
+
+    private static async Task EnsurePipReadyAsync(
+        string pythonPath,
+        Action<string, string, string?> report,
+        CancellationToken cancellationToken)
+    {
+        var pipCheck = await ProcessRunner.RunAsync(
+            pythonPath,
+            "-m pip --version",
+            cancellationToken,
+            timeoutMs: 30_000);
+
+        if (pipCheck.ExitCode != 0)
+        {
+            report("Packages", "Bootstrapping pip...", null);
+            await RunPythonPipAsync(
+                pythonPath,
+                "-m ensurepip --upgrade",
+                report,
+                cancellationToken,
+                timeoutMs: 120_000);
+        }
+
+        await RunPythonPipAsync(
+            pythonPath,
+            "-m pip install --upgrade pip setuptools wheel",
+            report,
+            cancellationToken,
+            timeoutMs: 300_000);
     }
 
     private static bool IsSupportedPythonVersion(string? version)
@@ -312,6 +383,18 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
         }
     }
 
+    private static bool IsWingetSuccess(int exitCode, string output)
+    {
+        if (exitCode == 0)
+        {
+            return true;
+        }
+
+        return output.Contains("already installed", StringComparison.OrdinalIgnoreCase)
+            || output.Contains("No available upgrade found", StringComparison.OrdinalIgnoreCase)
+            || output.Contains("Found an existing package", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task InstallWithWingetAsync(
         string packageId,
         Action<string, string, string?> report,
@@ -328,12 +411,10 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
             cancellationToken,
             timeoutMs: 900_000);
 
-        if (result.ExitCode != 0)
+        var combinedOutput = $"{result.StandardOutput}\n{result.StandardError}";
+        if (!IsWingetSuccess(result.ExitCode, combinedOutput))
         {
-            var details = string.IsNullOrWhiteSpace(result.StandardError)
-                ? result.StandardOutput
-                : result.StandardError;
-            throw new InvalidOperationException($"Failed to install {packageId} via winget: {details}");
+            throw new InvalidOperationException($"Failed to install {packageId} via winget: {combinedOutput}");
         }
     }
 
@@ -357,7 +438,7 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
             var details = string.IsNullOrWhiteSpace(result.StandardError)
                 ? result.StandardOutput
                 : result.StandardError;
-            throw new InvalidOperationException($"pip failed: {details}");
+            throw new InvalidOperationException($"pip failed ({arguments}): {details}");
         }
     }
 }

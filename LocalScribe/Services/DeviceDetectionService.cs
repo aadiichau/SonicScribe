@@ -57,7 +57,7 @@ public sealed class DeviceDetectionService : IDeviceDetectionService
             return _cachedInfo;
         }
 
-        var pythonPath = await PythonLocator.LocateAsync(
+        var pythonPath = await PythonLocator.LocateSupportedAsync(
             _settingsService.Current.PythonExecutablePath,
             cancellationToken);
 

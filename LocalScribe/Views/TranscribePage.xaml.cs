@@ -76,7 +76,11 @@ public sealed partial class TranscribePage : Page
         await ViewModel.EnqueueFilesAsync(paths);
     }
 
-    private void TranscribePage_Loaded(object sender, RoutedEventArgs e) => SyncLanguageComboBoxSelection();
+    private async void TranscribePage_Loaded(object sender, RoutedEventArgs e)
+    {
+        SyncLanguageComboBoxSelection();
+        await ViewModel.InitializeAsync();
+    }
 
     private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

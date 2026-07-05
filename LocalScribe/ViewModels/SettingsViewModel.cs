@@ -254,7 +254,7 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            var path = await PythonLocator.LocateAsync(
+            var path = await PythonLocator.LocateSupportedAsync(
                 string.IsNullOrWhiteSpace(PythonPath) ? null : PythonPath);
 
             if (path is null)

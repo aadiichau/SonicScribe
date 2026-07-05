@@ -19,6 +19,9 @@ public partial class TranscribeViewModel : ObservableObject
     private readonly IExportService _exportService;
     private readonly IClipboardService _clipboardService;
     private readonly IShellService _shellService;
+    private readonly IPrerequisiteSetupService _prerequisiteSetupService;
+    private readonly IDeviceDetectionService _deviceDetectionService;
+    private readonly IWhisperEngineHost _whisperEngineHost;
     private readonly Dictionary<string, QueueJobItemViewModel> _queueItemLookup = new();
     private string? _viewingJobId;
 
@@ -85,6 +88,19 @@ public partial class TranscribeViewModel : ObservableObject
     [ObservableProperty]
     private QueueJobItemViewModel? _selectedQueueItem;
 
+    [ObservableProperty]
+    private bool _isTranscriptionReady;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallEverythingCommand))]
+    private bool _isInstallingSetup;
+
+    [ObservableProperty]
+    private string _setupBannerMessage = "Install Python, faster-whisper, and PyTorch to start transcribing.";
+
+    [ObservableProperty]
+    private string _setupProgressMessage = string.Empty;
+
     public ObservableCollection<QueueJobItemViewModel> QueueItems { get; } = [];
 
     public ObservableCollection<TranscriptLineViewModel> TranscriptLines { get; } = [];
@@ -97,7 +113,10 @@ public partial class TranscribeViewModel : ObservableObject
         ISettingsService settingsService,
         IExportService exportService,
         IClipboardService clipboardService,
-        IShellService shellService)
+        IShellService shellService,
+        IPrerequisiteSetupService prerequisiteSetupService,
+        IDeviceDetectionService deviceDetectionService,
+        IWhisperEngineHost whisperEngineHost)
     {
         _jobQueueService = jobQueueService;
         _filePickerService = filePickerService;
@@ -105,11 +124,97 @@ public partial class TranscribeViewModel : ObservableObject
         _exportService = exportService;
         _clipboardService = clipboardService;
         _shellService = shellService;
+        _prerequisiteSetupService = prerequisiteSetupService;
+        _deviceDetectionService = deviceDetectionService;
+        _whisperEngineHost = whisperEngineHost;
         _jobQueueService.QueueChanged += OnQueueChanged;
         _jobQueueService.JobUpdated += OnJobUpdated;
         SelectedLanguage = _settingsService.Current.DefaultLanguage;
         RefreshQueueState();
     }
+
+    public async Task InitializeAsync()
+    {
+        await CheckPrerequisitesAsync();
+    }
+
+    [RelayCommand]
+    private async Task CheckPrerequisitesAsync()
+    {
+        try
+        {
+            var report = await _prerequisiteSetupService.CheckAsync();
+            IsTranscriptionReady = report.IsTranscriptionReady;
+
+            if (report.IsTranscriptionReady)
+            {
+                SetupBannerMessage = "All required components are installed.";
+                return;
+            }
+
+            var missing = string.Join(
+                ", ",
+                report.MissingItems
+                    .Where(item => item.Kind is not PrerequisiteKind.Winget)
+                    .Select(item => item.Name));
+
+            SetupBannerMessage = string.IsNullOrWhiteSpace(missing)
+                ? "Tap Install everything to set up SonicScribe automatically."
+                : $"Missing: {missing}. Tap Install everything — takes 10–30 minutes.";
+        }
+        catch (Exception ex)
+        {
+            IsTranscriptionReady = false;
+            SetupBannerMessage = $"Could not check setup status: {ex.Message}";
+        }
+        finally
+        {
+            NotifySetupVisibility();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanInstallEverything))]
+    private async Task InstallEverythingAsync()
+    {
+        IsInstallingSetup = true;
+        SetupProgressMessage = "Starting automatic setup...";
+        SetStatus("Installing prerequisites. This can take 10–30 minutes — do not close the app.", AppMessageSeverity.Warning);
+
+        try
+        {
+            var progress = new Progress<PrerequisiteSetupProgress>(update =>
+            {
+                SetupProgressMessage = $"{update.Step}: {update.Message}";
+            });
+
+            var report = await _prerequisiteSetupService.InstallMissingAsync(progress);
+            IsTranscriptionReady = report.IsTranscriptionReady;
+            _whisperEngineHost.InvalidateWorker();
+            _deviceDetectionService.InvalidateCache();
+            await _deviceDetectionService.DetectAsync(forceRefresh: true);
+
+            SetupBannerMessage = report.IsTranscriptionReady
+                ? "Setup complete! Drop files to start transcribing."
+                : "Setup finished with warnings. Try Install everything again.";
+            SetStatus(
+                report.IsTranscriptionReady ? "Setup complete! You can start transcribing." : "Setup incomplete.",
+                report.IsTranscriptionReady ? AppMessageSeverity.Success : AppMessageSeverity.Warning);
+        }
+        catch (Exception ex)
+        {
+            IsTranscriptionReady = false;
+            SetupBannerMessage = $"Setup failed: {ex.Message}";
+            SetStatus($"Setup failed: {ex.Message}", AppMessageSeverity.Error);
+        }
+        finally
+        {
+            IsInstallingSetup = false;
+            SetupProgressMessage = string.Empty;
+            NotifySetupVisibility();
+        }
+    }
+
+    private bool CanInstallEverything() => !IsInstallingSetup;
 
     [RelayCommand]
     private async Task BrowseFilesAsync()
@@ -155,6 +260,12 @@ public partial class TranscribeViewModel : ObservableObject
 
     public async Task StartProcessingAsync()
     {
+        if (!IsTranscriptionReady)
+        {
+            SetStatus("Install everything first — tap the setup button on this page.", AppMessageSeverity.Warning);
+            return;
+        }
+
         if (!_jobQueueService.Queue.Any(job => job.Status == TranscriptionJobStatus.Queued))
         {
             SetStatus("No queued files to process.", AppMessageSeverity.Warning);
@@ -624,6 +735,26 @@ public partial class TranscribeViewModel : ObservableObject
     public Visibility TranscriptPanelVisibility => ShowTranscriptPanel ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility EmptyPanelVisibility => ShowEmptyPanel ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility SetupBannerVisibility =>
+        !IsTranscriptionReady ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility SetupButtonVisibility =>
+        !IsTranscriptionReady && !IsInstallingSetup ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility SetupProgressVisibility =>
+        IsInstallingSetup ? Visibility.Visible : Visibility.Collapsed;
+
+    private void NotifySetupVisibility()
+    {
+        OnPropertyChanged(nameof(SetupBannerVisibility));
+        OnPropertyChanged(nameof(SetupButtonVisibility));
+        OnPropertyChanged(nameof(SetupProgressVisibility));
+    }
+
+    partial void OnIsTranscriptionReadyChanged(bool value) => NotifySetupVisibility();
+
+    partial void OnIsInstallingSetupChanged(bool value) => NotifySetupVisibility();
 
     public InfoBarSeverity StatusInfoBarSeverity => StatusSeverity switch
     {
