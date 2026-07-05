@@ -3,13 +3,13 @@ using CommunityToolkit.Mvvm.Input;
 using LocalScribe.Core;
 using LocalScribe.Models;
 using LocalScribe.Services;
-
 namespace LocalScribe.ViewModels;
 
 public partial class AboutViewModel : ObservableObject
 {
     private readonly IUpdateCheckService _updateCheckService;
-    private readonly IShellService _shellService;
+    private readonly UpdatePromptService _updatePromptService;
+    private readonly LocalScribe.MainWindow _mainWindow;
     private UpdateCheckResult? _lastUpdateResult;
 
     [ObservableProperty]
@@ -27,10 +27,14 @@ public partial class AboutViewModel : ObservableObject
     [ObservableProperty]
     private bool _isUpdateAvailable;
 
-    public AboutViewModel(IUpdateCheckService updateCheckService, IShellService shellService)
+    public AboutViewModel(
+        IUpdateCheckService updateCheckService,
+        UpdatePromptService updatePromptService,
+        LocalScribe.MainWindow mainWindow)
     {
         _updateCheckService = updateCheckService;
-        _shellService = shellService;
+        _updatePromptService = updatePromptService;
+        _mainWindow = mainWindow;
     }
 
     public string AppName => AppBranding.AppName;
@@ -71,12 +75,19 @@ public partial class AboutViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanDownloadUpdate))]
-    private Task DownloadUpdateAsync()
+    private async Task DownloadUpdateAsync()
     {
-        var url = _lastUpdateResult?.DownloadUrl ?? AppBranding.ReleasesUrl;
-        _shellService.OpenUrl(url);
-        UpdateStatusMessage = "Opening the latest installer in your browser...";
-        return Task.CompletedTask;
+        if (_lastUpdateResult is null || !_lastUpdateResult.IsUpdateAvailable)
+        {
+            return;
+        }
+
+        UpdateStatusMessage = "Downloading and installing update...";
+        var applied = await _updatePromptService.ApplyUpdateAsync(_mainWindow, _lastUpdateResult);
+        if (!applied)
+        {
+            UpdateStatusMessage = $"Update available: v{_lastUpdateResult.LatestVersion} (you have v{_lastUpdateResult.CurrentVersion}).";
+        }
     }
 
     private bool CanDownloadUpdate() => IsUpdateAvailable && !IsCheckingForUpdates;

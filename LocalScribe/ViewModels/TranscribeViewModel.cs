@@ -512,6 +512,8 @@ public partial class TranscribeViewModel : ObservableObject
                 $"Job {job.JobId} ({job.FileName}): {job.ErrorMessage ?? job.LogMessage}");
             _ = LoadTranscriptViewAsync();
             SetStatus(job.ErrorMessage ?? job.LogMessage, AppMessageSeverity.Error);
+            RepairModelCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(RepairModelVisibility));
         }
         else if (job.Status == TranscriptionJobStatus.Cancelled)
         {
@@ -719,6 +721,8 @@ public partial class TranscribeViewModel : ObservableObject
                 ? job.LogMessage
                 : job.ErrorMessage;
             ShowErrorPanel = true;
+            RepairModelCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(RepairModelVisibility));
             return;
         }
 
@@ -898,6 +902,35 @@ public partial class TranscribeViewModel : ObservableObject
     public Visibility TranscriptPanelVisibility => ShowTranscriptPanel ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility ErrorPanelVisibility => ShowErrorPanel ? Visibility.Visible : Visibility.Collapsed;
+
+    public bool CanRepairModel => WhisperModelCacheHelper.IsCorruptModelError(ErrorPanelMessage);
+
+    public Visibility RepairModelVisibility => CanRepairModel ? Visibility.Visible : Visibility.Collapsed;
+
+    [RelayCommand(CanExecute = nameof(CanRepairModel))]
+    private async Task RepairModelAsync()
+    {
+        if (!WhisperModelCacheHelper.TryRepairCorruptModel(ErrorPanelMessage, out var summary))
+        {
+            SetStatus(summary, AppMessageSeverity.Warning);
+            return;
+        }
+
+        _whisperEngineHost.InvalidateWorker();
+
+        var job = GetViewingJob();
+        if (job is not null)
+        {
+            await _jobQueueService.ResetJobForRetryAsync(job.JobId);
+        }
+
+        ClearResultPanels();
+        UpdateRightPanel();
+        RefreshQueueState();
+        SetStatus(summary, AppMessageSeverity.Success);
+        RepairModelCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(RepairModelVisibility));
+    }
 
     public Visibility ResultPlaceholderVisibility =>
         ShowResultPlaceholder ? Visibility.Visible : Visibility.Collapsed;

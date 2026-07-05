@@ -57,7 +57,7 @@ public partial class App : Application
     {
         var settingsService = Services.GetRequiredService<ISettingsService>();
         var updateService = Services.GetRequiredService<IUpdateCheckService>();
-        var shellService = Services.GetRequiredService<IShellService>();
+        var updatePromptService = Services.GetRequiredService<UpdatePromptService>();
 
         await settingsService.LoadAsync();
         var result = await updateService.CheckForUpdatesAsync();
@@ -81,9 +81,10 @@ public partial class App : Application
             Title = "Update available",
             Content =
                 $"SonicScribe v{result.LatestVersion} is available (you have v{result.CurrentVersion}).\n\n" +
-                "Download and run the new installer to update. Your settings and history are kept." +
+                "Update now to download and install silently inside the app, then restart automatically. " +
+                "Your settings and history are kept." +
                 notes,
-            PrimaryButtonText = "Download update",
+            PrimaryButtonText = "Update now",
             SecondaryButtonText = "Later",
             CloseButtonText = "Skip this version",
             DefaultButton = ContentDialogButton.Primary,
@@ -93,7 +94,7 @@ public partial class App : Application
         var dialogResult = await dialog.ShowAsync();
         if (dialogResult == ContentDialogResult.Primary)
         {
-            shellService.OpenUrl(result.DownloadUrl ?? AppBranding.ReleasesUrl);
+            await updatePromptService.ApplyUpdateAsync(mainWindow, result);
             return;
         }
 

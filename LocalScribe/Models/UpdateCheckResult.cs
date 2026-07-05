@@ -12,6 +12,10 @@ public sealed class UpdateCheckResult
 
     public string? DownloadUrl { get; init; }
 
+    public string? InstallerDownloadUrl { get; init; }
+
+    public string? PortableDownloadUrl { get; init; }
+
     public string? ReleasePageUrl { get; init; }
 
     public string? ErrorMessage { get; init; }

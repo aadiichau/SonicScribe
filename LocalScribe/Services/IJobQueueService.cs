@@ -28,6 +28,8 @@ public interface IJobQueueService
 
     Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken = default);
 
+    Task<bool> ResetJobForRetryAsync(string jobId, CancellationToken cancellationToken = default);
+
     Task RemoveCompletedJobsAsync(CancellationToken cancellationToken = default);
 
     void SyncQueuedJobsFromSettings();

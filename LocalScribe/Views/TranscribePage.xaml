@@ -387,6 +387,11 @@
                             Foreground="#FFFCA5A5"
                             Text="{x:Bind ViewModel.ErrorPanelMessage, Mode=OneWay}"
                             TextWrapping="WrapWholeWords" />
+                        <Button
+                            Command="{x:Bind ViewModel.RepairModelCommand}"
+                            Content="Repair model &amp; retry"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Visibility="{x:Bind ViewModel.RepairModelVisibility, Mode=OneWay}" />
                         <TextBlock
                             FontSize="12"
                             Opacity="0.65"

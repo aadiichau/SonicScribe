@@ -92,7 +92,7 @@
                             Content="Check for updates" />
                         <Button
                             Command="{x:Bind ViewModel.DownloadUpdateCommand}"
-                            Content="Download update"
+                            Content="Update now"
                             Style="{StaticResource AccentButtonStyle}" />
                         <ProgressRing
                             Width="20"

@@ -73,6 +73,13 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             var installerAsset = release.Assets?
                 .FirstOrDefault(asset => asset.Name?.StartsWith("SonicScribe-Setup-v", StringComparison.OrdinalIgnoreCase) == true
                     && asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            var portableAsset = release.Assets?
+                .FirstOrDefault(asset => asset.Name?.Contains("Portable-win-x64.zip", StringComparison.OrdinalIgnoreCase) == true);
+
+            var installerUrl = installerAsset?.BrowserDownloadUrl
+                ?? $"https://github.com/{AppBranding.GitHubRepo}/releases/latest/download/SonicScribe-Setup-v{latestVersion}.exe";
+            var portableUrl = portableAsset?.BrowserDownloadUrl
+                ?? $"https://github.com/{AppBranding.GitHubRepo}/releases/latest/download/SonicScribe-v{latestVersion}-Portable-win-x64.zip";
 
             var result = new UpdateCheckResult
             {
@@ -80,8 +87,9 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
                 CurrentVersion = currentVersion,
                 LatestVersion = latestVersion,
                 ReleaseNotes = TrimReleaseNotes(release.Body),
-                DownloadUrl = installerAsset?.BrowserDownloadUrl
-                    ?? $"https://github.com/{AppBranding.GitHubRepo}/releases/latest/download/SonicScribe-Setup-v{latestVersion}.exe",
+                DownloadUrl = installerUrl,
+                InstallerDownloadUrl = installerUrl,
+                PortableDownloadUrl = portableUrl,
                 ReleasePageUrl = release.HtmlUrl
                     ?? $"https://github.com/{AppBranding.GitHubRepo}/releases/latest"
             };

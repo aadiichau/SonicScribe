@@ -147,6 +147,36 @@ public sealed class JobQueueService : IJobQueueService
         return Task.CompletedTask;
     }
 
+    public Task<bool> ResetJobForRetryAsync(string jobId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_sync)
+        {
+            if (ActiveJob?.JobId.Equals(jobId, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(false);
+            }
+
+            var job = _queue.FirstOrDefault(item =>
+                item.JobId.Equals(jobId, StringComparison.OrdinalIgnoreCase));
+
+            if (job is null || job.Status != TranscriptionJobStatus.Error)
+            {
+                return Task.FromResult(false);
+            }
+
+            job.Status = TranscriptionJobStatus.Queued;
+            job.Progress = 0;
+            job.LogMessage = "Queued...";
+            job.ErrorMessage = null;
+            _logger.LogInformation("Reset job {JobId} to queued for retry", jobId);
+        }
+
+        RaiseQueueChanged();
+        return Task.FromResult(true);
+    }
+
     public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
