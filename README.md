@@ -1,40 +1,79 @@
-# SonicScribe
+<p align="center">
+  <img src="docs/icon.png" alt="SonicScribe" width="128" />
+</p>
 
-Local speech-to-text for Windows, powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Transcribe audio and video on your PC — no cloud, no usage limits.
+<h1 align="center">SonicScribe</h1>
 
-![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-blue)
-![.NET](https://img.shields.io/badge/.NET-8-purple)
+<p align="center">
+  <strong>Local speech-to-text for Windows — private, unlimited, GPU-accelerated.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/aadiichau/SonicScribe/releases/latest">
+    <img src="https://img.shields.io/github/v/release/aadiichau/SonicScribe?label=Download&style=for-the-badge" alt="Download" />
+  </a>
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" />
+  <img src="https://img.shields.io/badge/.NET-8-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 8" />
+  <img src="https://img.shields.io/badge/Whisper-large--v3-10B981?style=for-the-badge" alt="Whisper" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="MIT" />
+</p>
+
+<p align="center">
+  Transcribe audio and video on your own PC with <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a>.
+  No cloud. No accounts. No usage caps.
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/screenshot.png" alt="SonicScribe About screen" width="900" />
+</p>
+
+---
+
+## Download
+
+| | |
+|---|---|
+| **Latest release** | [**SonicScribe-win-x64.zip**](https://github.com/aadiichau/SonicScribe/releases/latest/download/SonicScribe-win-x64.zip) |
+| **Size** | ~150 MB zipped (~200 MB extracted) |
+| **Platform** | Windows 10/11, 64-bit |
+
+1. Download and unzip the folder
+2. Install Python prerequisites (below)
+3. Run `SonicScribe.exe`
+
+> **Important:** Keep every file in the folder together. Do not copy only the `.exe`.
+
+---
 
 ## Features
 
-- Unlimited local transcription (MP3, MP4, WAV, M4A, FLAC, MKV, WEBM, and more)
-- GPU acceleration with NVIDIA CUDA, CPU fallback
-- 99+ languages with auto-detect
-- Queue multiple files, review transcripts in-app
-- Export TXT, SRT, VTT, JSON
-- Searchable history
+| Feature | Description |
+|---------|-------------|
+| **Fully local** | Audio never leaves your machine |
+| **GPU accelerated** | NVIDIA CUDA support with automatic CPU fallback |
+| **99+ languages** | Auto-detect or pick a language manually |
+| **Batch queue** | Drop multiple files and process them in order |
+| **In-app review** | Read transcripts with optional timestamps |
+| **Exports** | TXT, SRT, VTT, and JSON |
+| **History** | Search and revisit past transcriptions |
 
-## Quick start (download release)
+**Supported formats:** MP3, MP4, WAV, M4A, FLAC, MKV, WEBM, and more (FFmpeg recommended for video).
 
-1. Download the latest **`SonicScribe-win-x64.zip`** from [Releases](https://github.com/YOUR_USERNAME/SonicScribe/releases).
-2. Unzip anywhere (e.g. `Desktop\SonicScribe`).
-3. Install prerequisites (see below).
-4. Run **`SonicScribe.exe`**.
-
-> Keep all files in the folder together. Do not copy only the `.exe`.
+---
 
 ## Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| Windows 10/11 (64-bit) | Required |
-| Python 3.11 or 3.12 | [python.org](https://www.python.org/downloads/) |
-| faster-whisper + PyTorch | See install commands below |
-| FFmpeg | Recommended for video (`winget install Gyan.FFmpeg`) |
+SonicScribe is a desktop shell around Whisper. Users still need Python + ML libraries on their PC (one-time setup).
 
-### Python packages
+### 1. Python 3.11 or 3.12
 
-**NVIDIA GPU (CUDA):**
+Download from [python.org](https://www.python.org/downloads/) and check **"Add Python to PATH"** during install.
+
+### 2. Whisper + PyTorch
+
+**NVIDIA GPU (recommended):**
 
 ```powershell
 pip install faster-whisper torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
@@ -46,45 +85,86 @@ pip install faster-whisper torch torchvision torchaudio --index-url https://down
 pip install faster-whisper torch torchvision torchaudio
 ```
 
-In SonicScribe: **Settings → Auto-detect Python → Re-detect GPU**.
+### 3. FFmpeg (recommended for video)
+
+```powershell
+winget install Gyan.FFmpeg
+```
+
+### 4. First launch
+
+Open **Settings** in SonicScribe → **Auto-detect Python** → **Re-detect GPU** (if you have an NVIDIA card).
+
+---
+
+## Quick start
+
+```
+1. Download SonicScribe-win-x64.zip from Releases
+2. Unzip to Desktop\SonicScribe (or anywhere)
+3. Install Python packages (see above)
+4. Double-click SonicScribe.exe
+5. Drop an audio/video file → Start
+```
+
+Transcripts save to `Documents\SonicScribe\Outputs\`.
+
+---
 
 ## Build from source
 
-Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) and Windows 10/11.
+For developers who want to compile locally:
+
+**Requirements:** Windows 10/11, [.NET 8 SDK](https://dotnet.microsoft.com/download)
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/SonicScribe.git
+git clone https://github.com/aadiichau/SonicScribe.git
 cd SonicScribe
 .\publish.ps1
 ```
 
 Output: `dist\SonicScribe\SonicScribe.exe`
 
-## Project layout
+---
 
-| Path | Purpose |
-|---|---|
-| `LocalScribe/` | WinUI 3 app (C#) |
-| `LocalScribe/Engine/transcribe_worker.py` | Whisper worker process |
-| `publish.ps1` | Build self-contained release |
-| `scripts/generate_icons.py` | Regenerate app icons from PNG |
+## Project structure
 
-## Data locations
-
-| Data | Path |
-|---|---|
-| Transcripts | `Documents\SonicScribe\Outputs\` |
-| Settings & history | `%LocalAppData%\SonicScribe\` |
-
-## Publishing a GitHub release (for maintainers)
-
-```powershell
-.\publish.ps1
-Compress-Archive -Path dist\SonicScribe\* -DestinationPath SonicScribe-win-x64.zip -Force
+```
+SonicScribe/
+├── LocalScribe/              # WinUI 3 app (C#)
+│   ├── Engine/               # Python Whisper worker
+│   ├── Views/                # UI pages
+│   └── Assets/               # App icons
+├── publish.ps1               # Build standalone release
+├── release.ps1               # Build + zip for GitHub Releases
+└── scripts/generate_icons.py # Regenerate icons from PNG
 ```
 
-Upload `SonicScribe-win-x64.zip` to a new GitHub Release (tag e.g. `v1.0.0`).
+---
+
+## Data & privacy
+
+| Data | Location |
+|------|----------|
+| Transcript exports | `%USERPROFILE%\Documents\SonicScribe\Outputs\` |
+| Settings & history | `%LOCALAPPDATA%\SonicScribe\` |
+
+Everything stays on your computer. No telemetry, no cloud API calls for transcription.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. For bugs, include your Windows version, GPU model, Python version, and the file type you tried to transcribe.
+
+---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) — free to use, modify, and share.
+
+---
+
+<p align="center">
+  <sub>Built with WinUI 3 · faster-whisper · OpenAI Whisper</sub>
+</p>
