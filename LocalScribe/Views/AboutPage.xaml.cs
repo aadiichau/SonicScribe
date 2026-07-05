@@ -16,8 +16,9 @@ public sealed partial class AboutPage : Page
         Loaded += AboutPage_Loaded;
     }
 
-    private void AboutPage_Loaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void AboutPage_Loaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         AppLogoImage.Source = AssetPathHelper.CreateBitmap("Assets/StoreLogo.png", decodePixelWidth: 224);
+        await ViewModel.InitializeAsync();
     }
 }

@@ -28,4 +28,14 @@ public sealed class ShellService : IShellService
             Verb = "open"
         });
     }
+
+    public void OpenUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
 }

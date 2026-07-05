@@ -40,6 +40,7 @@ public partial class App : Application
             var startup = Services.GetRequiredService<AppStartupService>();
             await startup.InitializeAsync();
             await MaybeRunFirstLaunchSetupAsync(mainWindow);
+            await MaybePromptForUpdateAsync(mainWindow);
         }
         catch (Exception ex)
         {
@@ -49,6 +50,56 @@ public partial class App : Application
         finally
         {
             mainWindow.SetStartupOverlayVisible(false);
+        }
+    }
+
+    private static async Task MaybePromptForUpdateAsync(MainWindow mainWindow)
+    {
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        var updateService = Services.GetRequiredService<IUpdateCheckService>();
+        var shellService = Services.GetRequiredService<IShellService>();
+
+        await settingsService.LoadAsync();
+        var result = await updateService.CheckForUpdatesAsync();
+
+        if (!updateService.ShouldShowUpdatePrompt(result, settingsService.Current.DismissedUpdateVersion))
+        {
+            return;
+        }
+
+        if (mainWindow.Content?.XamlRoot is null)
+        {
+            return;
+        }
+
+        var notes = string.IsNullOrWhiteSpace(result.ReleaseNotes)
+            ? string.Empty
+            : $"\n\n{result.ReleaseNotes}";
+
+        var dialog = new ContentDialog
+        {
+            Title = "Update available",
+            Content =
+                $"SonicScribe v{result.LatestVersion} is available (you have v{result.CurrentVersion}).\n\n" +
+                "Download and run the new installer to update. Your settings and history are kept." +
+                notes,
+            PrimaryButtonText = "Download update",
+            SecondaryButtonText = "Later",
+            CloseButtonText = "Skip this version",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = mainWindow.Content.XamlRoot
+        };
+
+        var dialogResult = await dialog.ShowAsync();
+        if (dialogResult == ContentDialogResult.Primary)
+        {
+            shellService.OpenUrl(result.DownloadUrl ?? AppBranding.ReleasesUrl);
+            return;
+        }
+
+        if (dialogResult == ContentDialogResult.None && result.LatestVersion is not null)
+        {
+            updateService.MarkUpdatePromptDismissed(result.LatestVersion);
         }
     }
 

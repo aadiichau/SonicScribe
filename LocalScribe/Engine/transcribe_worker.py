@@ -69,12 +69,6 @@ def pick_compute_types(device: str, vram_gb: float) -> list[str]:
     return ["float16", "int8_float16", "int8"]
 
 
-def adjust_model_for_vram(model_size: str, vram_gb: float) -> str:
-    if device_is_low_vram(vram_gb) and model_size in {"large-v3", "large-v2", "large"}:
-        return "medium"
-    return model_size
-
-
 def device_is_low_vram(vram_gb: float) -> bool:
     return 0 < vram_gb < 6
 
@@ -85,23 +79,22 @@ def get_model(model_size: str) -> tuple[object, str, str, str]:
     from faster_whisper import WhisperModel
 
     device, gpu_name, device_label, vram_gb = detect_device()
-    effective_model = adjust_model_for_vram(model_size, vram_gb)
 
-    if effective_model != model_size:
+    if device_is_low_vram(vram_gb) and model_size in {"large-v3", "large-v2", "large"}:
         emit(
             {
                 "type": "status",
                 "status": "loading_model",
                 "progress": 4,
                 "log": (
-                    f"{gpu_name} has {vram_gb:.1f} GB VRAM — using {effective_model} "
-                    f"instead of {model_size} for stability."
+                    f"{gpu_name} has {vram_gb:.1f} GB VRAM — loading {model_size} "
+                    f"with memory-efficient settings. First run downloads "
+                    f"{MODEL_DOWNLOAD_HINTS.get(model_size, 'several GB')}."
                 ),
                 "device": device_label,
                 "gpu_name": gpu_name,
             }
         )
-        model_size = effective_model
 
     if (
         _model_instance is not None
@@ -222,7 +215,7 @@ def _load_model_with_heartbeat(
 
 def transcribe(command: dict) -> None:
     file_path = command.get("file")
-    model_size = command.get("model", "medium")
+    model_size = command.get("model", "large-v3")
     language = command.get("language") or "auto"
     job_id = command.get("job_id", "")
 

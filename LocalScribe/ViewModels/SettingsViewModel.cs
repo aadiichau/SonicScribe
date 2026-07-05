@@ -24,7 +24,7 @@ public partial class SettingsViewModel : ObservableObject
     private string _statusMessage = "Configure defaults for new transcription jobs.";
 
     [ObservableProperty]
-    private string _selectedModel = "medium";
+    private string _selectedModel = "large-v3";
 
     [ObservableProperty]
     private string _selectedLanguage = "zh";
@@ -287,7 +287,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void ResetDefaults()
     {
-        SelectedModel = "medium";
+        SelectedModel = "large-v3";
         SelectedLanguage = "zh";
         OutputFolder = new Models.AppSettings().OutputFolder;
         StatusMessage = "Restored default model, language, and output folder. Press Save to persist.";

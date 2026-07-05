@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDeviceDetectionService, DeviceDetectionService>();
         services.AddSingleton<IPrerequisiteSetupService, PrerequisiteSetupService>();
+        services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
         services.AddSingleton<IHistoryService, HistoryService>();
         services.AddSingleton<AppStartupService>();
         services.AddSingleton<IClipboardService, ClipboardService>();

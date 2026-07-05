@@ -4,7 +4,7 @@ namespace LocalScribe.Models;
 
 public sealed class AppSettings
 {
-    public string DefaultModel { get; set; } = "medium";
+    public string DefaultModel { get; set; } = "large-v3";
 
     public string DefaultLanguage { get; set; } = "auto";
 
@@ -23,4 +23,8 @@ public sealed class AppSettings
     public string? PythonExecutablePath { get; set; }
 
     public bool HasDismissedSetupPrompt { get; set; }
+
+    public DateTimeOffset? LastUpdateCheckUtc { get; set; }
+
+    public string? DismissedUpdateVersion { get; set; }
 }

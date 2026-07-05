@@ -82,6 +82,33 @@
 
             <Border Style="{StaticResource PlaceholderCardStyle}">
                 <StackPanel Spacing="12">
+                    <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="UPDATES" />
+                    <TextBlock
+                        Text="{x:Bind ViewModel.UpdateStatusMessage, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            Command="{x:Bind ViewModel.CheckForUpdatesCommand}"
+                            Content="Check for updates" />
+                        <Button
+                            Command="{x:Bind ViewModel.DownloadUpdateCommand}"
+                            Content="Download update"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <ProgressRing
+                            Width="20"
+                            Height="20"
+                            IsActive="{x:Bind ViewModel.IsCheckingForUpdates, Mode=OneWay}" />
+                    </StackPanel>
+                    <TextBlock
+                        FontSize="12"
+                        Opacity="0.65"
+                        Text="SonicScribe downloads updates from GitHub. Run the new installer to update — your settings are kept."
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource PlaceholderCardStyle}">
+                <StackPanel Spacing="12">
                     <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="REQUIREMENTS" />
                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.Requirements, Mode=OneWay}">
                         <ItemsRepeater.ItemTemplate>

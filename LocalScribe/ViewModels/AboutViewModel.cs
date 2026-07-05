@@ -1,22 +1,43 @@
-using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LocalScribe.Core;
+using LocalScribe.Models;
+using LocalScribe.Services;
 
 namespace LocalScribe.ViewModels;
 
 public partial class AboutViewModel : ObservableObject
 {
+    private readonly IUpdateCheckService _updateCheckService;
+    private readonly IShellService _shellService;
+    private UpdateCheckResult? _lastUpdateResult;
+
     [ObservableProperty]
     private string _pageTitle = "About";
 
     [ObservableProperty]
     private string _statusMessage = "Local speech-to-text powered by Whisper.";
 
+    [ObservableProperty]
+    private string _updateStatusMessage = "Checks GitHub for new SonicScribe releases.";
+
+    [ObservableProperty]
+    private bool _isCheckingForUpdates;
+
+    [ObservableProperty]
+    private bool _isUpdateAvailable;
+
+    public AboutViewModel(IUpdateCheckService updateCheckService, IShellService shellService)
+    {
+        _updateCheckService = updateCheckService;
+        _shellService = shellService;
+    }
+
     public string AppName => AppBranding.AppName;
 
     public string Tagline => AppBranding.Tagline;
 
-    public string VersionLabel => $"Version {GetAppVersion()}";
+    public string VersionLabel => $"Version {AppVersion.Current}";
 
     public string Description =>
         $"{AppBranding.AppName} transcribes audio and video files on your PC using OpenAI Whisper "
@@ -38,9 +59,55 @@ public partial class AboutViewModel : ObservableObject
         "FFmpeg recommended for video and additional audio formats",
     ];
 
-    private static string GetAppVersion()
+    public async Task InitializeAsync()
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version is null ? "1.0.0" : $"{version.Major}.{version.Minor}.{version.Build}";
+        await RefreshUpdateStatusAsync(forceRefresh: false);
     }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        await RefreshUpdateStatusAsync(forceRefresh: true);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDownloadUpdate))]
+    private Task DownloadUpdateAsync()
+    {
+        var url = _lastUpdateResult?.DownloadUrl ?? AppBranding.ReleasesUrl;
+        _shellService.OpenUrl(url);
+        UpdateStatusMessage = "Opening the latest installer in your browser...";
+        return Task.CompletedTask;
+    }
+
+    private bool CanDownloadUpdate() => IsUpdateAvailable && !IsCheckingForUpdates;
+
+    private async Task RefreshUpdateStatusAsync(bool forceRefresh)
+    {
+        IsCheckingForUpdates = true;
+
+        try
+        {
+            var result = await _updateCheckService.CheckForUpdatesAsync(forceRefresh);
+            _lastUpdateResult = result;
+            IsUpdateAvailable = result.IsUpdateAvailable;
+
+            if (!result.IsSuccessful)
+            {
+                UpdateStatusMessage = $"Could not check for updates: {result.ErrorMessage}";
+                return;
+            }
+
+            UpdateStatusMessage = result.IsUpdateAvailable
+                ? $"Update available: v{result.LatestVersion} (you have v{result.CurrentVersion})."
+                : $"You are on the latest version (v{result.CurrentVersion}).";
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+            DownloadUpdateCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    partial void OnIsUpdateAvailableChanged(bool value) =>
+        DownloadUpdateCommand.NotifyCanExecuteChanged();
 }
