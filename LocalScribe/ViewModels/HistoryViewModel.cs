@@ -65,6 +65,18 @@ public partial class HistoryViewModel : ObservableObject
         _exportService = exportService;
         _clipboardService = clipboardService;
         _shellService = shellService;
+        _historyService.HistoryChanged += OnHistoryChanged;
+    }
+
+    private async void OnHistoryChanged(object? sender, EventArgs e)
+    {
+        await _historyService.LoadAsync();
+        RebuildHistoryList();
+
+        if (!string.IsNullOrWhiteSpace(_selectedJobId))
+        {
+            await LoadSelectedJobAsync();
+        }
     }
 
     public async Task InitializeAsync()

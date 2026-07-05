@@ -4,6 +4,8 @@ namespace LocalScribe.Services;
 
 public interface IHistoryService
 {
+    event EventHandler? HistoryChanged;
+
     IReadOnlyList<TranscriptionJob> Items { get; }
 
     Task LoadAsync(CancellationToken cancellationToken = default);

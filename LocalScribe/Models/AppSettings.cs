@@ -18,6 +18,8 @@ public sealed class AppSettings
 
     public bool LegacyHistoryImported { get; set; }
 
+    public bool UserClearedHistory { get; set; }
+
     public string? LegacyHistoryPath { get; set; }
 
     public string? PythonExecutablePath { get; set; }

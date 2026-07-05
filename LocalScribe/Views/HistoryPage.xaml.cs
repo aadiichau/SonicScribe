@@ -43,7 +43,7 @@ public sealed partial class HistoryPage : Page
         var dialog = new ContentDialog
         {
             Title = "Clear all history?",
-            Content = $"This removes all {ViewModel.ItemCount} entries from history. Export files on disk are not deleted.",
+            Content = $"This removes all {ViewModel.ItemCount} entries from history. Export files on disk are not deleted, and old LocalScribe entries will not be re-imported.",
             PrimaryButtonText = "Clear history",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,

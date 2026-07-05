@@ -32,6 +32,8 @@ public sealed class HistoryService : IHistoryService
         _historyFilePath = Path.Combine(folder, "history.json");
     }
 
+    public event EventHandler? HistoryChanged;
+
     public IReadOnlyList<TranscriptionJob> Items => _items;
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -66,6 +68,18 @@ public sealed class HistoryService : IHistoryService
 
         if (!settings.ImportLegacyHistoryOnFirstLaunch || settings.LegacyHistoryImported)
         {
+            return 0;
+        }
+
+        // A native history file means SonicScribe has been used before (even if cleared to []).
+        // Do not re-import legacy Flask entries after clear, reinstall, or settings reset.
+        if (File.Exists(_historyFilePath))
+        {
+            _logger.LogInformation(
+                "Skipping legacy import because native history file already exists at {Path}.",
+                _historyFilePath);
+            settings.LegacyHistoryImported = true;
+            await _settingsService.SaveAsync(cancellationToken);
             return 0;
         }
 
@@ -146,6 +160,7 @@ public sealed class HistoryService : IHistoryService
         }
 
         await SaveAsync(cancellationToken);
+        RaiseHistoryChanged();
     }
 
     public async Task RenameAsync(string jobId, string name, CancellationToken cancellationToken = default)
@@ -173,19 +188,26 @@ public sealed class HistoryService : IHistoryService
 
         await SaveAsync(cancellationToken);
         _logger.LogInformation("Deleted job {JobId} from history", jobId);
+        RaiseHistoryChanged();
     }
 
     public async Task ClearAllAsync(CancellationToken cancellationToken = default)
     {
-        if (_items.Count == 0)
-        {
-            return;
-        }
-
         var count = _items.Count;
         _items.Clear();
         await SaveAsync(cancellationToken);
-        _logger.LogInformation("Cleared {Count} entries from history", count);
+
+        var settings = _settingsService.Current;
+        settings.LegacyHistoryImported = true;
+        settings.UserClearedHistory = true;
+        await _settingsService.SaveAsync(cancellationToken);
+
+        if (count > 0)
+        {
+            _logger.LogInformation("Cleared {Count} entries from history", count);
+        }
+
+        RaiseHistoryChanged();
     }
 
     public Task<TranscriptionJob?> GetByIdAsync(string jobId, CancellationToken cancellationToken = default)
@@ -193,5 +215,10 @@ public sealed class HistoryService : IHistoryService
         cancellationToken.ThrowIfCancellationRequested();
         var job = _items.FirstOrDefault(item => item.JobId == jobId);
         return Task.FromResult(job);
+    }
+
+    private void RaiseHistoryChanged()
+    {
+        UiDispatcher.Invoke(() => HistoryChanged?.Invoke(this, EventArgs.Empty));
     }
 }
