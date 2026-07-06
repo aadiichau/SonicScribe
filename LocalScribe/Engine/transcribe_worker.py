@@ -43,6 +43,8 @@ MODEL_EXPECTED_BYTES = {
     "base": 150_000_000,
 }
 
+MINIMUM_HEALTHY_FRACTION = 0.5
+
 
 def hf_cache_root() -> Path:
     return Path.home() / ".cache" / "huggingface" / "hub"
@@ -72,6 +74,46 @@ def model_download_state(model_size: str) -> tuple[int, int, int]:
     downloaded = directory_size(repo_path)
     percent = int(min(99, round((downloaded / expected) * 100))) if expected > 0 else 0
     return downloaded, expected, percent
+
+
+def clear_model_cache(model_size: str) -> bool:
+    repo_path = hf_cache_root() / hf_repo_name(model_size)
+    if not repo_path.exists():
+        return False
+
+    import shutil
+
+    shutil.rmtree(repo_path, ignore_errors=True)
+    return True
+
+
+def is_model_cache_healthy(model_size: str) -> bool:
+    repo_path = hf_cache_root() / hf_repo_name(model_size)
+    if not repo_path.exists():
+        return True
+
+    snapshots_path = repo_path / "snapshots"
+    if not snapshots_path.exists():
+        return False
+
+    expected = MODEL_EXPECTED_BYTES.get(model_size, 1_000_000_000)
+    minimum_bytes = max(50_000_000, int(expected * MINIMUM_HEALTHY_FRACTION))
+
+    for snapshot_dir in snapshots_path.iterdir():
+        if not snapshot_dir.is_dir():
+            continue
+
+        model_bin = snapshot_dir / "model.bin"
+        if not model_bin.is_file():
+            continue
+
+        try:
+            if model_bin.stat().st_size >= minimum_bytes:
+                return True
+        except OSError:
+            continue
+
+    return False
 
 
 def fmt_bytes(num_bytes: int) -> str:
@@ -124,6 +166,20 @@ def get_model(model_size: str) -> tuple[object, str, str, str]:
     global _model_instance, _current_model_size, _current_device, _current_compute_type
 
     from faster_whisper import WhisperModel
+
+    if not is_model_cache_healthy(model_size):
+        clear_model_cache(model_size)
+        emit(
+            {
+                "type": "status",
+                "status": "loading_model",
+                "progress": 4,
+                "log": (
+                    f"Removed incomplete {model_size} model cache. "
+                    f"Re-downloading {MODEL_DOWNLOAD_HINTS.get(model_size, 'the model')}..."
+                ),
+            }
+        )
 
     device, gpu_name, device_label, vram_gb = detect_device()
 

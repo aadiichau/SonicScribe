@@ -993,6 +993,7 @@ public partial class TranscribeViewModel : ObservableObject
         if (job is not null)
         {
             await _jobQueueService.ResetJobForRetryAsync(job.JobId);
+            await _jobQueueService.StartAsync();
         }
 
         ClearResultPanels();

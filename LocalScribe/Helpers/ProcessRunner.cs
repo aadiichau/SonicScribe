@@ -18,6 +18,10 @@ public static class ProcessRunner
     {
         startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
         startInfo.Environment["PYTHONUTF8"] = "1";
+
+        // HuggingFace hub uses symlinks by default; on Windows those often break and leave 0-byte model.bin files.
+        startInfo.Environment["HF_HUB_DISABLE_SYMLINKS"] = "1";
+        startInfo.Environment["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1";
     }
 
     public static async Task<ProcessResult> RunAsync(
