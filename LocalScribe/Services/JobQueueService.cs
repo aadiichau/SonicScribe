@@ -282,6 +282,13 @@ public sealed class JobQueueService : IJobQueueService
 
                 ApplyCurrentSettingsToJob(nextJob);
 
+                var outputFolder = AppDataPathHelper.EnsureOutputFolderReady(_settingsService.Current.OutputFolder);
+                if (!string.Equals(outputFolder, _settingsService.Current.OutputFolder, StringComparison.OrdinalIgnoreCase))
+                {
+                    _settingsService.Current.OutputFolder = outputFolder;
+                    await _settingsService.SaveAsync(cancellationToken);
+                }
+
                 nextJob.Status = TranscriptionJobStatus.LoadingModel;
                 nextJob.Progress = 0;
                 nextJob.LogMessage = "Starting...";

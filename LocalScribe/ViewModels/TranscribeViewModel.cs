@@ -438,7 +438,13 @@ public partial class TranscribeViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanUseTranscript))]
     private void OpenOutputFolder()
     {
-        var folder = _settingsService.Current.OutputFolder;
+        var folder = AppDataPathHelper.EnsureOutputFolderReady(_settingsService.Current.OutputFolder);
+        if (!string.Equals(folder, _settingsService.Current.OutputFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            _settingsService.Current.OutputFolder = folder;
+            _ = _settingsService.SaveAsync();
+        }
+
         _shellService.OpenFolder(folder);
         SetStatus("Opened output folder.");
     }

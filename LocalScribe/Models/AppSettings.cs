@@ -1,4 +1,5 @@
 using LocalScribe.Core;
+using LocalScribe.Helpers;
 
 namespace LocalScribe.Models;
 
@@ -8,11 +9,7 @@ public sealed class AppSettings
 
     public string DefaultLanguage { get; set; } = "auto";
 
-    public string OutputFolder { get; set; } =
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            AppBranding.DataFolderName,
-            "Outputs");
+    public string OutputFolder { get; set; } = AppDataPathHelper.GetDefaultOutputFolder();
 
     public bool ImportLegacyHistoryOnFirstLaunch { get; set; } = true;
 

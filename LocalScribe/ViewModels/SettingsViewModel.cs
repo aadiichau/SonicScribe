@@ -189,7 +189,8 @@ public partial class SettingsViewModel : ObservableObject
                 ? null
                 : PythonPath.Trim();
 
-            Directory.CreateDirectory(_settingsService.Current.OutputFolder);
+            _settingsService.Current.OutputFolder =
+                AppDataPathHelper.EnsureOutputFolderReady(_settingsService.Current.OutputFolder);
             await _settingsService.SaveAsync();
 
             var pythonChanged = !string.Equals(
@@ -236,7 +237,7 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        Directory.CreateDirectory(OutputFolder);
+        OutputFolder = AppDataPathHelper.EnsureOutputFolderReady(OutputFolder);
         _shellService.OpenFolder(OutputFolder);
     }
 
@@ -294,7 +295,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         SelectedModel = "large-v3";
         SelectedLanguage = "zh";
-        OutputFolder = new Models.AppSettings().OutputFolder;
+        OutputFolder = AppDataPathHelper.GetDefaultOutputFolder();
         StatusMessage = "Restored default model, language, and output folder. Press Save to persist.";
     }
 

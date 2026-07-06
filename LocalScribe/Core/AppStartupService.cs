@@ -1,3 +1,4 @@
+using LocalScribe.Helpers;
 using LocalScribe.Services;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +28,12 @@ public sealed class AppStartupService
         _logger.LogInformation("Starting {AppName} initialization.", AppBranding.AppName);
 
         await _settingsService.LoadAsync(cancellationToken);
-        Directory.CreateDirectory(_settingsService.Current.OutputFolder);
+        var outputFolder = AppDataPathHelper.EnsureOutputFolderReady(_settingsService.Current.OutputFolder);
+        if (!string.Equals(outputFolder, _settingsService.Current.OutputFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            _settingsService.Current.OutputFolder = outputFolder;
+            await _settingsService.SaveAsync(cancellationToken);
+        }
 
         try
         {

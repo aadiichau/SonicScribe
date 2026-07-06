@@ -1,3 +1,4 @@
+using LocalScribe.Helpers;
 using LocalScribe.Models;
 using Microsoft.Extensions.Logging;
 
@@ -100,8 +101,8 @@ public sealed class TranscriptionService : ITranscriptionService
         {
             _logger.LogError(ex, "Transcription failed for job {JobId}", job.JobId);
             job.Status = TranscriptionJobStatus.Error;
-            job.ErrorMessage = ex.Message;
-            job.LogMessage = $"Error: {ex.Message}";
+            job.ErrorMessage = BuildUserFacingError(ex);
+            job.LogMessage = $"Error: {job.ErrorMessage}";
             job.CompletedAt = DateTimeOffset.Now;
 
             progress.Report(new TranscriptionProgress
@@ -131,5 +132,19 @@ public sealed class TranscriptionService : ITranscriptionService
         _logger.LogInformation(
             "Exported outputs for job {JobId}: TXT, SRT, VTT, JSON, timestamped TXT",
             job.JobId);
+    }
+
+    private static string BuildUserFacingError(Exception ex)
+    {
+        var message = ex.Message;
+        if (message.Contains("Outputs", StringComparison.OrdinalIgnoreCase)
+            && message.Contains("Could not find file", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+                "Could not save transcript files. SonicScribe will retry using a local output folder on the next run. "
+                + "Open Settings and press Save, or reinstall the latest version.";
+        }
+
+        return message;
     }
 }

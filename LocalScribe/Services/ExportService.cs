@@ -28,12 +28,19 @@ public sealed class ExportService : IExportService
         string? outputFolder = null,
         CancellationToken cancellationToken = default)
     {
-        var folder = outputFolder ?? _settingsService.Current.OutputFolder;
-        Directory.CreateDirectory(folder);
+        var folder = AppDataPathHelper.EnsureOutputFolderReady(
+            outputFolder ?? _settingsService.Current.OutputFolder);
 
-        var baseName = string.IsNullOrWhiteSpace(job.DisplayName)
+        if (!string.Equals(folder, _settingsService.Current.OutputFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            _settingsService.Current.OutputFolder = folder;
+            await _settingsService.SaveAsync(cancellationToken);
+        }
+
+        var rawBaseName = string.IsNullOrWhiteSpace(job.DisplayName)
             ? Path.GetFileNameWithoutExtension(job.FileName)
             : job.DisplayName;
+        var baseName = AppDataPathHelper.SanitizeFileName(rawBaseName, fallback: job.JobId);
 
         var extension = format switch
         {

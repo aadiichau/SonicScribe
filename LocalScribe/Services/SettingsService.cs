@@ -30,6 +30,7 @@ public sealed class SettingsService : ISettingsService
         if (!File.Exists(_settingsFilePath))
         {
             Current = new AppSettings();
+            Current.OutputFolder = AppDataPathHelper.EnsureOutputFolderReady(Current.OutputFolder);
             await SaveAsync(cancellationToken);
             return;
         }
@@ -39,12 +40,13 @@ public sealed class SettingsService : ISettingsService
             await using var stream = File.OpenRead(_settingsFilePath);
             var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken);
             Current = settings ?? new AppSettings();
-            Current.OutputFolder = AppDataPathHelper.NormalizeOutputFolder(Current.OutputFolder);
+            Current.OutputFolder = AppDataPathHelper.EnsureOutputFolderReady(Current.OutputFolder);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load settings from {Path}", _settingsFilePath);
             Current = new AppSettings();
+            Current.OutputFolder = AppDataPathHelper.EnsureOutputFolderReady(Current.OutputFolder);
         }
     }
 

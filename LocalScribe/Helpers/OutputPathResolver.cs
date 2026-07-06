@@ -38,9 +38,10 @@ public static class OutputPathResolver
 
     public static string? ResolveVttPath(TranscriptionJob job, string outputFolder)
     {
-        var baseName = string.IsNullOrWhiteSpace(job.DisplayName)
+        var rawBaseName = string.IsNullOrWhiteSpace(job.DisplayName)
             ? Path.GetFileNameWithoutExtension(job.FileName)
             : job.DisplayName;
+        var baseName = AppDataPathHelper.SanitizeFileName(rawBaseName, fallback: job.JobId);
         var fileName = $"{job.JobId}_{baseName}.vtt";
 
         return ResolveFile(fileName, outputFolder);
