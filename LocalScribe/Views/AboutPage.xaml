@@ -50,6 +50,17 @@
                         LineHeight="24"
                         Text="{x:Bind ViewModel.Description, Mode=OneWay}"
                         TextWrapping="WrapWholeWords" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Opacity="0.75"
+                            Text="Created by" />
+                        <HyperlinkButton
+                            VerticalAlignment="Center"
+                            Content="{x:Bind ViewModel.GitHubProfileLabel, Mode=OneWay}"
+                            NavigateUri="{x:Bind ViewModel.GitHubProfileUrl, Mode=OneWay}" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

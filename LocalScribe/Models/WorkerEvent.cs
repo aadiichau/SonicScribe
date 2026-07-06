@@ -14,6 +14,15 @@ public sealed class WorkerEvent
     [JsonPropertyName("progress")]
     public int Progress { get; set; }
 
+    [JsonPropertyName("download_percent")]
+    public int? DownloadPercent { get; set; }
+
+    [JsonPropertyName("download_bytes")]
+    public long? DownloadBytes { get; set; }
+
+    [JsonPropertyName("download_total")]
+    public long? DownloadTotal { get; set; }
+
     [JsonPropertyName("log")]
     public string Log { get; set; } = string.Empty;
 

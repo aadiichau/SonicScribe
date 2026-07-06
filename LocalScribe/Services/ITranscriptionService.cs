@@ -16,6 +16,12 @@ public sealed class TranscriptionProgress
 
     public int Progress { get; init; }
 
+    public int? DownloadPercent { get; init; }
+
+    public long? DownloadBytes { get; init; }
+
+    public long? DownloadTotal { get; init; }
+
     public string LogMessage { get; init; } = string.Empty;
 
     public string? DetectedLanguage { get; init; }

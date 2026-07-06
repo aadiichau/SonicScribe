@@ -12,5 +12,7 @@ public static class AppBranding
 
     public const string GitHubRepo = "aadiichau/SonicScribe";
 
+    public const string GitHubProfileUrl = "https://github.com/aadiichau";
+
     public const string ReleasesUrl = "https://github.com/aadiichau/SonicScribe/releases/latest";
 }

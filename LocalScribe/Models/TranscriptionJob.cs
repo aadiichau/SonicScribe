@@ -14,6 +14,12 @@ public sealed class TranscriptionJob
 
     public int Progress { get; set; }
 
+    public int? DownloadPercent { get; set; }
+
+    public long? DownloadBytes { get; set; }
+
+    public long? DownloadTotal { get; set; }
+
     public string LogMessage { get; set; } = string.Empty;
 
     public string Model { get; set; } = "large-v3";

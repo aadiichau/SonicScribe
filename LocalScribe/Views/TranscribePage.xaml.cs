@@ -78,8 +78,28 @@ public sealed partial class TranscribePage : Page
 
     private async void TranscribePage_Loaded(object sender, RoutedEventArgs e)
     {
+        SyncModelComboBoxSelection();
         SyncLanguageComboBoxSelection();
         await ViewModel.InitializeAsync();
+    }
+
+    private void ModelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ModelComboBox.SelectedItem is WhisperModelOption option)
+        {
+            ViewModel.SelectedModel = option.Code;
+        }
+    }
+
+    private void SyncModelComboBoxSelection()
+    {
+        var match = ViewModel.AvailableModels.FirstOrDefault(model =>
+            string.Equals(model.Code, ViewModel.SelectedModel, StringComparison.OrdinalIgnoreCase));
+
+        if (match is not null)
+        {
+            ModelComboBox.SelectedItem = match;
+        }
     }
 
     private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -367,6 +367,9 @@ public sealed class JobQueueService : IJobQueueService
     {
         job.Status = progress.Status;
         job.Progress = progress.Progress;
+        job.DownloadPercent = progress.DownloadPercent ?? job.DownloadPercent;
+        job.DownloadBytes = progress.DownloadBytes ?? job.DownloadBytes;
+        job.DownloadTotal = progress.DownloadTotal ?? job.DownloadTotal;
         job.LogMessage = progress.LogMessage;
         job.DetectedLanguage = progress.DetectedLanguage ?? job.DetectedLanguage;
         job.AudioDurationSeconds = progress.AudioDurationSeconds ?? job.AudioDurationSeconds;

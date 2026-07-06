@@ -173,9 +173,8 @@ public partial class App : Application
         {
             var progress = new Progress<PrerequisiteSetupProgress>(update =>
             {
-                mainWindow.SetStartupOverlayMessage(
-                    update.Step,
-                    update.Message);
+                mainWindow.SetStartupOverlayMessage(update.Step, update.Message);
+                mainWindow.SetStartupOverlayProgress(update.Percent, update.IsIndeterminate);
             });
 
             await prerequisiteSetup.InstallMissingAsync(progress);

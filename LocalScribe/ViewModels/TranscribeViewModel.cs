@@ -98,6 +98,9 @@ public partial class TranscribeViewModel : ObservableObject
     private string _selectedLanguage = "auto";
 
     [ObservableProperty]
+    private string _selectedModel = "large-v3";
+
+    [ObservableProperty]
     private QueueJobItemViewModel? _selectedQueueItem;
 
     [ObservableProperty]
@@ -116,11 +119,19 @@ public partial class TranscribeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isModelLoading;
 
+    [ObservableProperty]
+    private int _modelDownloadPercent;
+
+    [ObservableProperty]
+    private int _setupProgressPercent;
+
     public ObservableCollection<QueueJobItemViewModel> QueueItems { get; } = [];
 
     public ObservableCollection<TranscriptLineViewModel> TranscriptLines { get; } = [];
 
     public IReadOnlyList<LanguageOption> AvailableLanguages { get; } = WhisperLanguageCatalog.All;
+
+    public IReadOnlyList<WhisperModelOption> AvailableModels => WhisperModelCatalog.All;
 
     public TranscribeViewModel(
         IJobQueueService jobQueueService,
@@ -145,11 +156,15 @@ public partial class TranscribeViewModel : ObservableObject
         _jobQueueService.QueueChanged += OnQueueChanged;
         _jobQueueService.JobUpdated += OnJobUpdated;
         SelectedLanguage = _settingsService.Current.DefaultLanguage;
+        SelectedModel = _settingsService.Current.DefaultModel;
         RefreshQueueState();
     }
 
     public async Task InitializeAsync()
     {
+        await _settingsService.LoadAsync();
+        SelectedModel = _settingsService.Current.DefaultModel;
+        OnPropertyChanged(nameof(ModelLabel));
         await CheckPrerequisitesAsync();
     }
 
@@ -200,6 +215,7 @@ public partial class TranscribeViewModel : ObservableObject
             var progress = new Progress<PrerequisiteSetupProgress>(update =>
             {
                 SetupProgressMessage = $"{update.Step}: {update.Message}";
+                SetupProgressPercent = update.Percent ?? SetupProgressPercent;
             });
 
             var report = await _prerequisiteSetupService.InstallMissingAsync(progress);
@@ -633,14 +649,29 @@ public partial class TranscribeViewModel : ObservableObject
         {
             HasActiveJob = false;
             IsModelLoading = false;
+            ModelDownloadPercent = 0;
             return;
         }
 
         HasActiveJob = true;
         ActiveFileName = job.DisplayName;
-        ActiveProgress = job.Progress;
-        ActiveLogMessage = job.LogMessage;
         IsModelLoading = job.Status == TranscriptionJobStatus.LoadingModel;
+
+        if (IsModelLoading && job.DownloadPercent is > 0)
+        {
+            ModelDownloadPercent = job.DownloadPercent.Value;
+            var downloaded = job.DownloadBytes ?? 0;
+            var total = job.DownloadTotal ?? WhisperModelCatalog.GetExpectedBytes(job.Model);
+            ActiveLogMessage =
+                $"Downloading {job.Model}: {ModelDownloadPercent}% ({WhisperModelCatalog.FormatBytes(downloaded)} / {WhisperModelCatalog.FormatBytes(total)})";
+            ActiveProgress = Math.Clamp(5 + (int)Math.Round(ModelDownloadPercent * 0.85), 5, 90);
+        }
+        else
+        {
+            ModelDownloadPercent = 0;
+            ActiveLogMessage = job.LogMessage;
+            ActiveProgress = job.Progress;
+        }
     }
 
     private void ClearTranscriptView()
@@ -862,7 +893,7 @@ public partial class TranscribeViewModel : ObservableObject
         }
     }
 
-    public string ModelLabel => $"Model: {_settingsService.Current.DefaultModel}";
+    public string ModelLabel => $"Model: {SelectedModel}";
 
     public string QueueCountLabel => $"{QueueCount} files";
 
@@ -887,14 +918,48 @@ public partial class TranscribeViewModel : ObservableObject
         }
     }
 
-    public string ActiveProgressLabel => IsModelLoading ? "Loading model..." : $"{ActiveProgress}%";
+    public string ActiveProgressLabel =>
+        IsModelLoading
+            ? ModelDownloadPercent > 0
+                ? $"{ModelDownloadPercent}% downloaded"
+                : "Preparing download..."
+            : $"{ActiveProgress}%";
 
-    public bool IsProgressIndeterminate => IsModelLoading;
+    public string ModelLoadingHint =>
+        "First transcription downloads the AI model (can take 5–30 minutes). "
+        + "If the percentage looks stuck for a few minutes, don't panic — large files download in bursts and progress will jump again. "
+        + "Please keep the app open.";
+
+    public bool IsProgressIndeterminate => IsModelLoading && ModelDownloadPercent <= 0;
+
+    public Visibility SetupProgressBarVisibility =>
+        IsInstallingSetup ? Visibility.Visible : Visibility.Collapsed;
 
     partial void OnIsModelLoadingChanged(bool value)
     {
         OnPropertyChanged(nameof(ActiveProgressLabel));
         OnPropertyChanged(nameof(IsProgressIndeterminate));
+        OnPropertyChanged(nameof(ModelLoadingHint));
+    }
+
+    partial void OnModelDownloadPercentChanged(int value)
+    {
+        OnPropertyChanged(nameof(ActiveProgressLabel));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+    }
+
+    partial void OnSelectedModelChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        _settingsService.Current.DefaultModel = value;
+        _jobQueueService.SyncQueuedJobsFromSettings();
+        OnPropertyChanged(nameof(ModelLabel));
+        RefreshQueueState();
+        _ = _settingsService.SaveAsync();
     }
 
     public Visibility ProgressPanelVisibility => ShowProgressPanel ? Visibility.Visible : Visibility.Collapsed;

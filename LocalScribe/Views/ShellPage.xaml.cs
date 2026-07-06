@@ -1,6 +1,5 @@
 using LocalScribe.Core.Navigation;
 using LocalScribe.Helpers;
-using LocalScribe.Services;
 using LocalScribe.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
@@ -11,8 +10,6 @@ namespace LocalScribe.Views;
 public sealed partial class ShellPage : Page
 {
     private readonly INavigationService _navigationService;
-    private readonly IFilePickerService _filePickerService;
-    private readonly IJobQueueService _jobQueueService;
     private bool _isRestoringSelection;
 
     public ShellViewModel ViewModel { get; }
@@ -21,8 +18,6 @@ public sealed partial class ShellPage : Page
     {
         ViewModel = App.Services.GetRequiredService<ShellViewModel>();
         _navigationService = App.Services.GetRequiredService<INavigationService>();
-        _filePickerService = App.Services.GetRequiredService<IFilePickerService>();
-        _jobQueueService = App.Services.GetRequiredService<IJobQueueService>();
 
         InitializeComponent();
 
@@ -100,30 +95,6 @@ public sealed partial class ShellPage : Page
             _isRestoringSelection = false;
             ViewModel.SelectedNavigationTag = tag;
             return;
-        }
-    }
-
-    private async void PaneAddFiles_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        NavigateToTag(NavigationTag.Transcribe);
-
-        var paths = await _filePickerService.PickMediaFilesAsync();
-        if (paths.Count == 0)
-        {
-            return;
-        }
-
-        var allowed = MediaFileTypes.FilterAllowed(paths).ToList();
-        if (allowed.Count == 0)
-        {
-            return;
-        }
-
-        await _jobQueueService.EnqueueAsync(allowed);
-
-        if (App.Services.GetService(typeof(TranscribeViewModel)) is TranscribeViewModel transcribeViewModel)
-        {
-            transcribeViewModel.RefreshFromQueue();
         }
     }
 

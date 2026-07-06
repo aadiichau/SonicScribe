@@ -44,6 +44,10 @@ public partial class AboutViewModel : ObservableObject
 
     public string VersionLabel => $"Version {AppVersion.Current}";
 
+    public string GitHubProfileUrl => AppBranding.GitHubProfileUrl;
+
+    public string GitHubProfileLabel => "github.com/aadiichau";
+
     public string Description =>
         $"{AppBranding.AppName} transcribes audio and video files on your PC using OpenAI Whisper "
         + "(via faster-whisper). Everything runs locally — your files never leave your machine.";

@@ -7,4 +7,8 @@ public sealed class PrerequisiteSetupProgress
     public string Message { get; init; } = string.Empty;
 
     public string? LogLine { get; init; }
+
+    public int? Percent { get; init; }
+
+    public bool IsIndeterminate { get; init; }
 }

@@ -79,19 +79,26 @@
                         Text="Installs Python 3.12, faster-whisper, PyTorch, and FFmpeg using winget + pip. First run may take 10–30 minutes."
                         TextWrapping="WrapWholeWords" />
 
-                    <TextBlock
-                        FontFamily="Consolas"
-                        FontSize="12"
-                        Opacity="0.85"
-                        Text="{x:Bind ViewModel.SetupProgressMessage, Mode=OneWay}"
-                        TextWrapping="WrapWholeWords"
-                        Visibility="{x:Bind ViewModel.ShowSetupProgress, Mode=OneWay}" />
+                    <StackPanel
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.ShowSetupProgress, Mode=OneWay}">
+                        <ProgressBar
+                            Maximum="100"
+                            Value="{x:Bind ViewModel.SetupProgressPercent, Mode=OneWay}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Opacity="0.85"
+                            Text="{x:Bind ViewModel.SetupProgressMessage, Mode=OneWay}"
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button
                             Command="{x:Bind ViewModel.InstallEverythingCommand}"
                             Content="Install everything"
-                            Style="{StaticResource AccentButtonStyle}" />
+                            Style="{StaticResource AccentButtonStyle}"
+                            Visibility="{x:Bind ViewModel.InstallButtonVisibility, Mode=OneWay}" />
                         <Button
                             Command="{x:Bind ViewModel.CheckPrerequisitesCommand}"
                             Content="Re-check" />

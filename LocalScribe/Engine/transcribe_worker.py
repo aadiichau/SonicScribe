@@ -34,6 +34,53 @@ MODEL_DOWNLOAD_HINTS = {
     "base": "~150 MB",
 }
 
+MODEL_EXPECTED_BYTES = {
+    "large-v3": 3_000_000_000,
+    "large-v2": 3_000_000_000,
+    "large": 3_000_000_000,
+    "medium": 1_500_000_000,
+    "small": 500_000_000,
+    "base": 150_000_000,
+}
+
+
+def hf_cache_root() -> Path:
+    return Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def hf_repo_name(model_size: str) -> str:
+    return f"models--Systran--faster-whisper-{model_size}"
+
+
+def directory_size(path: Path) -> int:
+    if not path.exists():
+        return 0
+
+    total = 0
+    for child in path.rglob("*"):
+        if child.is_file():
+            try:
+                total += child.stat().st_size
+            except OSError:
+                pass
+    return total
+
+
+def model_download_state(model_size: str) -> tuple[int, int, int]:
+    expected = MODEL_EXPECTED_BYTES.get(model_size, 1_000_000_000)
+    repo_path = hf_cache_root() / hf_repo_name(model_size)
+    downloaded = directory_size(repo_path)
+    percent = int(min(99, round((downloaded / expected) * 100))) if expected > 0 else 0
+    return downloaded, expected, percent
+
+
+def fmt_bytes(num_bytes: int) -> str:
+    if num_bytes >= 1_000_000_000:
+        return f"{num_bytes / 1_000_000_000:.1f} GB"
+    if num_bytes >= 1_000_000:
+        return f"{num_bytes / 1_000_000:.0f} MB"
+    return f"{num_bytes / 1_000:.0f} KB"
+
 
 def emit(payload: dict) -> None:
     print(json.dumps(payload, ensure_ascii=False), flush=True)
@@ -190,18 +237,32 @@ def _load_model_with_heartbeat(
 
     started = time.time()
     heartbeat = 0
-    while not done.wait(timeout=10):
+    while not done.wait(timeout=5):
         heartbeat += 1
         elapsed = int(time.time() - started)
+        downloaded, expected, download_percent = model_download_state(model_size)
+        mapped_progress = 5 + int(download_percent * 0.85) if download_percent > 0 else min(8, 5 + heartbeat)
+
+        if download_percent > 0 and downloaded < expected:
+            log = (
+                f"Downloading {model_size}: {download_percent}% "
+                f"({fmt_bytes(downloaded)} / {fmt_bytes(expected)})"
+            )
+        else:
+            log = (
+                f"Still loading {model_size}... {elapsed}s elapsed. "
+                f"First run downloads {download_hint} — please wait."
+            )
+
         emit(
             {
                 "type": "progress",
                 "status": "loading_model",
-                "progress": min(8, 5 + heartbeat),
-                "log": (
-                    f"Still loading {model_size}... {elapsed}s elapsed. "
-                    f"Downloading {download_hint} if this is the first run — please wait."
-                ),
+                "progress": mapped_progress,
+                "download_percent": download_percent,
+                "download_bytes": downloaded,
+                "download_total": expected,
+                "log": log,
                 "device": device.upper(),
                 "gpu_name": gpu_name,
             }

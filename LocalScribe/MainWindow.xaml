@@ -29,8 +29,11 @@
             <StackPanel
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
+                MinWidth="420"
+                MaxWidth="520"
                 Spacing="16">
                 <ProgressRing
+                    x:Name="StartupProgressRing"
                     Width="48"
                     Height="48"
                     IsActive="True" />
@@ -45,7 +48,32 @@
                     HorizontalAlignment="Center"
                     Opacity="0.7"
                     Text="Loading settings, history, and GPU profile"
-                    TextAlignment="Center" />
+                    TextAlignment="Center"
+                    TextWrapping="WrapWholeWords" />
+                <StackPanel
+                    x:Name="StartupProgressPanel"
+                    Spacing="8"
+                    Visibility="Collapsed">
+                    <ProgressBar
+                        x:Name="StartupProgressBar"
+                        Maximum="100"
+                        Value="0" />
+                    <TextBlock
+                        x:Name="StartupProgressLabel"
+                        HorizontalAlignment="Center"
+                        FontSize="12"
+                        Opacity="0.75"
+                        Text="0%" />
+                    <TextBlock
+                        x:Name="StartupReassuranceText"
+                        HorizontalAlignment="Center"
+                        FontSize="12"
+                        Opacity="0.6"
+                        Text="Large downloads can pause between chunks — don't panic, progress will continue."
+                        TextAlignment="Center"
+                        TextWrapping="WrapWholeWords"
+                        Visibility="Collapsed" />
+                </StackPanel>
             </StackPanel>
         </Grid>
     </Grid>

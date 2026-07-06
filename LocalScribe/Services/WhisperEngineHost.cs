@@ -255,7 +255,10 @@ public sealed class WhisperEngineHost : IWhisperEngineHost, IAsyncDisposable
             LogMessage = job.LogMessage,
             DetectedLanguage = job.DetectedLanguage,
             AudioDurationSeconds = job.AudioDurationSeconds,
-            Segments = job.Segments
+            Segments = job.Segments,
+            DownloadPercent = workerEvent.DownloadPercent,
+            DownloadBytes = workerEvent.DownloadBytes,
+            DownloadTotal = workerEvent.DownloadTotal
         });
     }
 

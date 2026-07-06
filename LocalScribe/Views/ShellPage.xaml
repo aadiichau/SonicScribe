@@ -77,22 +77,6 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <NavigationView.PaneFooter>
-                <StackPanel Margin="12,8" Spacing="8">
-                    <Button
-                        x:Name="PaneAddFilesButton"
-                        HorizontalAlignment="Stretch"
-                        Click="PaneAddFiles_Click"
-                        Content="Add files"
-                        Style="{StaticResource AccentButtonStyle}" />
-                    <TextBlock
-                        FontSize="11"
-                        Foreground="#FF94A3B8"
-                        Text="Add audio/video to transcribe"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
-            </NavigationView.PaneFooter>
-
             <NavigationView.Content>
                 <Frame
                     x:Name="ContentFrame"

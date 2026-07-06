@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using LocalScribe.Helpers;
 using LocalScribe.Models;
 using Microsoft.Extensions.Logging;
@@ -97,12 +98,14 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
         IProgress<PrerequisiteSetupProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        void Report(string step, string message, string? logLine = null) =>
+        void Report(string step, string message, string? logLine = null, int? percent = null, bool isIndeterminate = false) =>
             progress?.Report(new PrerequisiteSetupProgress
             {
                 Step = step,
                 Message = message,
-                LogLine = logLine
+                LogLine = logLine,
+                Percent = percent,
+                IsIndeterminate = isIndeterminate
             });
 
         var report = await CheckAsync(cancellationToken);
@@ -125,29 +128,31 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
 
         if (!pythonItem.IsReady)
         {
-            Report("Python", "Installing Python 3.12 (this may take a few minutes)...");
-            await InstallWithWingetAsync(PythonWingetId, Report, cancellationToken);
+            Report("Python", "Installing Python 3.12 (this may take a few minutes)...", percent: 5, isIndeterminate: true);
+            await InstallWithWingetAsync(PythonWingetId, Report, cancellationToken, basePercent: 5, spanPercent: 10);
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
         }
 
         var pythonPath = await WaitForSupportedPythonAsync(Report, cancellationToken);
         _settingsService.Current.PythonExecutablePath = pythonPath;
         await _settingsService.SaveAsync(cancellationToken);
-        Report("Python", $"Using Python at {pythonPath}");
+        Report("Python", $"Using Python at {pythonPath}", percent: 18);
 
-        Report("Packages", "Preparing pip...");
+        Report("Packages", "Preparing pip...", percent: 20, isIndeterminate: true);
         await EnsurePipReadyAsync(pythonPath, Report, cancellationToken);
 
         report = await CheckAsync(cancellationToken);
         if (!report.Items.First(item => item.Kind == PrerequisiteKind.FasterWhisper).IsReady)
         {
-            Report("Packages", "Installing faster-whisper...");
+            Report("Packages", "Installing faster-whisper...", percent: 25, isIndeterminate: true);
             await RunPythonPipAsync(
                 pythonPath,
                 "-m pip install faster-whisper",
                 Report,
                 cancellationToken,
-                timeoutMs: 600_000);
+                timeoutMs: 600_000,
+                basePercent: 25,
+                spanPercent: 15);
         }
 
         report = await CheckAsync(cancellationToken);
@@ -156,7 +161,7 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
             var useCuda = await HasNvidiaGpuAsync(cancellationToken);
             if (useCuda)
             {
-                Report("Packages", "Installing PyTorch with NVIDIA GPU support (large download)...");
+                Report("Packages", "Installing PyTorch with NVIDIA GPU support (large download)...", percent: 42, isIndeterminate: true);
                 try
                 {
                     await RunPythonPipAsync(
@@ -164,29 +169,35 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
                         $"-m pip install torch torchvision torchaudio --index-url {CudaPipIndex}",
                         Report,
                         cancellationToken,
-                        timeoutMs: 1_800_000);
+                        timeoutMs: 1_800_000,
+                        basePercent: 42,
+                        spanPercent: 38);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "CUDA PyTorch install failed. Falling back to CPU build.");
-                    Report("Packages", "GPU install failed. Installing CPU PyTorch instead...");
+                    Report("Packages", "GPU install failed. Installing CPU PyTorch instead...", percent: 42, isIndeterminate: true);
                     await RunPythonPipAsync(
                         pythonPath,
                         "-m pip install torch torchvision torchaudio",
                         Report,
                         cancellationToken,
-                        timeoutMs: 1_800_000);
+                        timeoutMs: 1_800_000,
+                        basePercent: 42,
+                        spanPercent: 38);
                 }
             }
             else
             {
-                Report("Packages", "Installing PyTorch for CPU (large download)...");
+                Report("Packages", "Installing PyTorch for CPU (large download)...", percent: 42, isIndeterminate: true);
                 await RunPythonPipAsync(
                     pythonPath,
                     "-m pip install torch torchvision torchaudio",
                     Report,
                     cancellationToken,
-                    timeoutMs: 1_800_000);
+                    timeoutMs: 1_800_000,
+                    basePercent: 42,
+                    spanPercent: 38);
             }
         }
 
@@ -195,13 +206,13 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
         {
             try
             {
-                Report("FFmpeg", "Installing FFmpeg for video support...");
-                await InstallWithWingetAsync(FfmpegWingetId, Report, cancellationToken);
+                Report("FFmpeg", "Installing FFmpeg for video support...", percent: 85, isIndeterminate: true);
+                await InstallWithWingetAsync(FfmpegWingetId, Report, cancellationToken, basePercent: 85, spanPercent: 10);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "FFmpeg install failed. Continuing without FFmpeg.");
-                Report("FFmpeg", "FFmpeg install failed (optional). Video files may not work until FFmpeg is installed.");
+                Report("FFmpeg", "FFmpeg install failed (optional). Video files may not work until FFmpeg is installed.", percent: 90);
             }
         }
 
@@ -221,12 +232,12 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
                 $"Automatic setup could not finish. Still missing: {missing}. Try again or check Settings.");
         }
 
-        Report("Done", "Setup complete! You can start transcribing.");
+        Report("Done", "Setup complete! You can start transcribing.", percent: 100);
         return final;
     }
 
     private async Task<string> WaitForSupportedPythonAsync(
-        Action<string, string, string?> report,
+        Action<string, string, string?, int?, bool> report,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 12; attempt++)
@@ -239,7 +250,8 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
                 return pythonPath;
             }
 
-            report("Python", $"Waiting for Python to finish installing ({attempt + 1}/12)...", null);
+            var waitPercent = 8 + (int)Math.Round(attempt / 11.0 * 8);
+            report("Python", $"Waiting for Python to finish installing ({attempt + 1}/12)...", null, waitPercent, true);
             await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
         }
 
@@ -256,7 +268,7 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
 
     private static async Task EnsurePipReadyAsync(
         string pythonPath,
-        Action<string, string, string?> report,
+        Action<string, string, string?, int?, bool> report,
         CancellationToken cancellationToken)
     {
         var pipCheck = await ProcessRunner.RunAsync(
@@ -267,13 +279,15 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
 
         if (pipCheck.ExitCode != 0)
         {
-            report("Packages", "Bootstrapping pip...", null);
+            report("Packages", "Bootstrapping pip...", null, 20, true);
             await RunPythonPipAsync(
                 pythonPath,
                 "-m ensurepip --upgrade",
                 report,
                 cancellationToken,
-                timeoutMs: 120_000);
+                timeoutMs: 120_000,
+                basePercent: 20,
+                spanPercent: 3);
         }
 
         await RunPythonPipAsync(
@@ -281,7 +295,9 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
             "-m pip install --upgrade pip setuptools wheel",
             report,
             cancellationToken,
-            timeoutMs: 300_000);
+            timeoutMs: 300_000,
+            basePercent: 22,
+            spanPercent: 3);
     }
 
     private static bool IsSupportedPythonVersion(string? version)
@@ -397,8 +413,10 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
 
     private static async Task InstallWithWingetAsync(
         string packageId,
-        Action<string, string, string?> report,
-        CancellationToken cancellationToken)
+        Action<string, string, string?, int?, bool> report,
+        CancellationToken cancellationToken,
+        int basePercent = 0,
+        int spanPercent = 10)
     {
         var arguments =
             $"install -e --id {packageId} --scope user --accept-package-agreements --accept-source-agreements --disable-interactivity";
@@ -406,8 +424,8 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
         var result = await ProcessRunner.RunWithLiveOutputAsync(
             "winget",
             arguments,
-            line => report("Install", line, line),
-            line => report("Install", line, line),
+            line => ReportInstallLine(report, "Install", line, basePercent, spanPercent),
+            line => ReportInstallLine(report, "Install", line, basePercent, spanPercent),
             cancellationToken,
             timeoutMs: 900_000);
 
@@ -421,15 +439,17 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
     private static async Task RunPythonPipAsync(
         string pythonPath,
         string arguments,
-        Action<string, string, string?> report,
+        Action<string, string, string?, int?, bool> report,
         CancellationToken cancellationToken,
-        int timeoutMs)
+        int timeoutMs,
+        int basePercent = 0,
+        int spanPercent = 10)
     {
         var result = await ProcessRunner.RunWithLiveOutputAsync(
             pythonPath,
             arguments,
-            line => report("Packages", line, line),
-            line => report("Packages", line, line),
+            line => ReportInstallLine(report, "Packages", line, basePercent, spanPercent),
+            line => ReportInstallLine(report, "Packages", line, basePercent, spanPercent),
             cancellationToken,
             timeoutMs);
 
@@ -440,5 +460,51 @@ public sealed class PrerequisiteSetupService : IPrerequisiteSetupService
                 : result.StandardError;
             throw new InvalidOperationException($"pip failed ({arguments}): {details}");
         }
+
+        report("Packages", "Package install finished.", null, basePercent + spanPercent, false);
+    }
+
+    private static void ReportInstallLine(
+        Action<string, string, string?, int?, bool> report,
+        string step,
+        string line,
+        int basePercent,
+        int spanPercent)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        var trimmed = line.Trim();
+        var percent = TryParseDownloadPercent(trimmed);
+        if (percent is >= 0 and <= 100)
+        {
+            var mapped = basePercent + (int)Math.Round(spanPercent * (percent.Value / 100.0));
+            report(step, trimmed, trimmed, mapped, false);
+            return;
+        }
+
+        report(step, trimmed, trimmed, basePercent, true);
+    }
+
+    private static int? TryParseDownloadPercent(string line)
+    {
+        var percentMatch = Regex.Match(line, @"(\d{1,3})%");
+        if (percentMatch.Success && int.TryParse(percentMatch.Groups[1].Value, out var directPercent))
+        {
+            return directPercent;
+        }
+
+        var mbMatch = Regex.Match(line, @"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*MB", RegexOptions.IgnoreCase);
+        if (mbMatch.Success
+            && double.TryParse(mbMatch.Groups[1].Value, out var downloadedMb)
+            && double.TryParse(mbMatch.Groups[2].Value, out var totalMb)
+            && totalMb > 0)
+        {
+            return (int)Math.Clamp(Math.Round(downloadedMb / totalMb * 100.0), 0, 100);
+        }
+
+        return null;
     }
 }

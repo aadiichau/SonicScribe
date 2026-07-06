@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using LocalScribe.Helpers;
 using LocalScribe.Models;
 using LocalScribe.Services;
+using Microsoft.UI.Xaml;
 
 namespace LocalScribe.ViewModels;
 
@@ -71,17 +72,15 @@ public partial class SettingsViewModel : ObservableObject
     private bool _showSetupProgress;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InstallButtonVisibility))]
     private bool _isTranscriptionReady;
+
+    [ObservableProperty]
+    private int _setupProgressPercent;
 
     public ObservableCollection<PrerequisiteLineViewModel> PrerequisiteLines { get; } = [];
 
-    public IReadOnlyList<ModelOption> AvailableModels { get; } =
-    [
-        new("large-v3", "large-v3 — Best quality"),
-        new("medium", "medium — Faster"),
-        new("small", "small — Fastest"),
-        new("base", "base — Ultra fast")
-    ];
+    public IReadOnlyList<WhisperModelOption> AvailableModels => WhisperModelCatalog.All;
 
     public IReadOnlyList<LanguageOption> AvailableLanguages { get; } = WhisperLanguageCatalog.All;
 
@@ -146,6 +145,8 @@ public partial class SettingsViewModel : ObservableObject
             var progress = new Progress<PrerequisiteSetupProgress>(update =>
             {
                 SetupProgressMessage = $"{update.Step}: {update.Message}";
+                SetupProgressPercent = update.Percent ?? SetupProgressPercent;
+                ShowSetupProgress = update.IsIndeterminate || update.Percent is not null;
             });
 
             var report = await _prerequisiteSetupService.InstallMissingAsync(progress);
@@ -168,7 +169,11 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
-    private bool CanInstallPrerequisites() => !IsInstallingPrerequisites && !IsCheckingPrerequisites;
+    private bool CanInstallPrerequisites() =>
+        !IsTranscriptionReady && !IsInstallingPrerequisites && !IsCheckingPrerequisites;
+
+    public Visibility InstallButtonVisibility =>
+        IsTranscriptionReady ? Visibility.Collapsed : Visibility.Visible;
 
     [RelayCommand]
     private async Task SaveAsync()
@@ -345,6 +350,8 @@ public partial class SettingsViewModel : ObservableObject
     private void ApplyPrerequisiteReport(PrerequisiteReport report)
     {
         IsTranscriptionReady = report.IsTranscriptionReady;
+        OnPropertyChanged(nameof(InstallButtonVisibility));
+        InstallEverythingCommand.NotifyCanExecuteChanged();
 
         if (PrerequisiteLines.Count == 0)
         {
@@ -362,5 +369,3 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 }
-
-public sealed record ModelOption(string Code, string DisplayName);
