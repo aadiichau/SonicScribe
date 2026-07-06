@@ -981,7 +981,8 @@ public partial class TranscribeViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRepairModel))]
     private async Task RepairModelAsync()
     {
-        if (!WhisperModelCacheHelper.TryRepairCorruptModel(ErrorPanelMessage, out var summary))
+        var job = GetViewingJob();
+        if (!WhisperModelCacheHelper.TryRepairCorruptModel(ErrorPanelMessage, job?.Model, out var summary))
         {
             SetStatus(summary, AppMessageSeverity.Warning);
             return;
@@ -989,7 +990,6 @@ public partial class TranscribeViewModel : ObservableObject
 
         _whisperEngineHost.InvalidateWorker();
 
-        var job = GetViewingJob();
         if (job is not null)
         {
             await _jobQueueService.ResetJobForRetryAsync(job.JobId);

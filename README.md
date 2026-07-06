@@ -126,7 +126,7 @@ Output lands in `dist\SonicScribe\`.
 | App won't open | Don't move `SonicScribe.exe` out of its folder. Check `%LocalAppData%\SonicScribe\logs\crash.log`. |
 | Won't transcribe | Run **Install everything** in Settings, or install Python packages manually. |
 | `Could not find file ... Outputs` | Update to v1.0.1+. Or create `Documents\SonicScribe\Outputs` yourself. |
-| `model.bin` error | Click **Repair model & retry**, or delete the `faster-whisper` folder under `%USERPROFILE%\.cache\huggingface\hub\`. |
+| `model.bin` error | Update to v1.0.2+ (auto-fixes and re-downloads). Or click **Repair model & retry**. Manual fix: delete `%USERPROFILE%\.cache\huggingface\hub\models--Systran--faster-whisper-large-v3`. |
 
 ---
 

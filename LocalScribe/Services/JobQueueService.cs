@@ -9,6 +9,7 @@ public sealed class JobQueueService : IJobQueueService
     private readonly ISettingsService _settingsService;
     private readonly ITranscriptionService _transcriptionService;
     private readonly IHistoryService _historyService;
+    private readonly IWhisperEngineHost _whisperEngineHost;
     private readonly ILogger<JobQueueService> _logger;
     private readonly List<TranscriptionJob> _queue = [];
     private readonly object _sync = new();
@@ -21,11 +22,13 @@ public sealed class JobQueueService : IJobQueueService
         ISettingsService settingsService,
         ITranscriptionService transcriptionService,
         IHistoryService historyService,
+        IWhisperEngineHost whisperEngineHost,
         ILogger<JobQueueService> logger)
     {
         _settingsService = settingsService;
         _transcriptionService = transcriptionService;
         _historyService = historyService;
+        _whisperEngineHost = whisperEngineHost;
         _logger = logger;
     }
 
@@ -297,32 +300,63 @@ public sealed class JobQueueService : IJobQueueService
                 _logger.LogInformation("Processing job {JobId}", nextJob.JobId);
 
                 var progress = new Progress<TranscriptionProgress>(update => ApplyProgress(nextJob, update));
+                var modelRepairRetried = false;
 
                 try
                 {
-                    var result = await _transcriptionService.TranscribeAsync(nextJob, progress, cancellationToken);
-                    ApplyJobSnapshot(nextJob, result);
-                    nextJob.CompletedAt = DateTimeOffset.Now;
-                    nextJob.TranscribedAt = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm");
+                    while (true)
+                    {
+                        WhisperModelCacheHelper.EnsureHealthyModelCacheOrClear(nextJob.Model, _logger);
 
-                    if (result.Status == TranscriptionJobStatus.Done)
-                    {
-                        nextJob.Progress = 100;
-                        await _historyService.AddOrUpdateAsync(nextJob, cancellationToken);
-                        _logger.LogInformation("Completed job {JobId}", nextJob.JobId);
-                    }
-                    else if (result.Status == TranscriptionJobStatus.Cancelled)
-                    {
-                        _logger.LogInformation("Job {JobId} was cancelled.", nextJob.JobId);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Job {JobId} finished with status {Status}", nextJob.JobId, result.Status);
-                    }
+                        var result = await _transcriptionService.TranscribeAsync(nextJob, progress, cancellationToken);
+                        ApplyJobSnapshot(nextJob, result);
 
-                    if (result.IsTerminal)
-                    {
-                        NotifyJobUpdated(nextJob);
+                        if (result.Status == TranscriptionJobStatus.Error
+                            && WhisperModelCacheHelper.IsCorruptModelError(result.ErrorMessage)
+                            && !modelRepairRetried
+                            && WhisperModelCacheHelper.TryRepairCorruptModel(
+                                result.ErrorMessage,
+                                nextJob.Model,
+                                out var repairSummary))
+                        {
+                            modelRepairRetried = true;
+                            _whisperEngineHost.InvalidateWorker();
+                            nextJob.Status = TranscriptionJobStatus.LoadingModel;
+                            nextJob.Progress = 0;
+                            nextJob.ErrorMessage = null;
+                            nextJob.LogMessage = repairSummary;
+                            NotifyJobUpdated(nextJob);
+                            _logger.LogWarning(
+                                "Auto-repairing corrupt model cache for job {JobId}: {Summary}",
+                                nextJob.JobId,
+                                repairSummary);
+                            continue;
+                        }
+
+                        nextJob.CompletedAt = DateTimeOffset.Now;
+                        nextJob.TranscribedAt = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm");
+
+                        if (result.Status == TranscriptionJobStatus.Done)
+                        {
+                            nextJob.Progress = 100;
+                            await _historyService.AddOrUpdateAsync(nextJob, cancellationToken);
+                            _logger.LogInformation("Completed job {JobId}", nextJob.JobId);
+                        }
+                        else if (result.Status == TranscriptionJobStatus.Cancelled)
+                        {
+                            _logger.LogInformation("Job {JobId} was cancelled.", nextJob.JobId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Job {JobId} finished with status {Status}", nextJob.JobId, result.Status);
+                        }
+
+                        if (result.IsTerminal)
+                        {
+                            NotifyJobUpdated(nextJob);
+                        }
+
+                        break;
                     }
                 }
                 catch (OperationCanceledException)
