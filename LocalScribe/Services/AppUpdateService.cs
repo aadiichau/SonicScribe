@@ -21,7 +21,28 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("SonicScribe-Updater");
     }
 
-    public bool IsInstalledCopy => DetectInstalledCopy();
+    public bool IsInstalledCopy
+    {
+        get
+        {
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(exePath))
+            {
+                return false;
+            }
+
+            var directory = Path.GetDirectoryName(exePath) ?? string.Empty;
+            string[] installMarkers =
+            [
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "SonicScribe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "SonicScribe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "SonicScribe")
+            ];
+
+            return installMarkers.Any(marker =>
+                directory.StartsWith(marker, StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     public async Task<AppUpdateResult> DownloadAndApplyAsync(
         UpdateCheckResult update,
@@ -38,11 +59,8 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
 
         try
         {
-            if (IsInstalledCopy)
-            {
-                return await ApplyInstallerUpdateAsync(update, updatesFolder, progress, cancellationToken);
-            }
-
+            // Always use the portable zip for in-app updates. Silent installers often fail on Windows
+            // (UAC prompts, locked files) while the app is still running.
             return await ApplyPortableUpdateAsync(update, updatesFolder, progress, cancellationToken);
         }
         catch (OperationCanceledException)
@@ -54,51 +72,6 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
             _logger.LogError(ex, "In-app update failed.");
             return new AppUpdateResult { ErrorMessage = ex.Message };
         }
-    }
-
-    private async Task<AppUpdateResult> ApplyInstallerUpdateAsync(
-        UpdateCheckResult update,
-        string updatesFolder,
-        IProgress<AppUpdateProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        var downloadUrl = update.InstallerDownloadUrl;
-        if (string.IsNullOrWhiteSpace(downloadUrl))
-        {
-            return new AppUpdateResult { ErrorMessage = "Installer download URL was not found." };
-        }
-
-        var installerPath = Path.Combine(
-            updatesFolder,
-            $"SonicScribe-Setup-v{update.LatestVersion}.exe");
-
-        progress?.Report(new AppUpdateProgress
-        {
-            Stage = "Downloading",
-            Message = $"Downloading SonicScribe v{update.LatestVersion}...",
-            Percent = 0
-        });
-
-        await DownloadFileAsync(downloadUrl, installerPath, progress, cancellationToken).ConfigureAwait(false);
-
-        progress?.Report(new AppUpdateProgress
-        {
-            Stage = "Installing",
-            Message = "Installing update silently. SonicScribe will restart automatically...",
-            Percent = 100
-        });
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = installerPath,
-            Arguments = "/VERYSILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /NORESTART",
-            UseShellExecute = true
-        };
-
-        Process.Start(startInfo);
-        _logger.LogInformation("Launched silent installer for v{Version}", update.LatestVersion);
-
-        return new AppUpdateResult { Success = true, RestartScheduled = true };
     }
 
     private async Task<AppUpdateResult> ApplyPortableUpdateAsync(
@@ -148,12 +121,15 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
         ZipFile.ExtractToDirectory(zipPath, stagingFolder, overwriteFiles: true);
 
         var scriptPath = Path.Combine(updatesFolder, "apply-portable-update.cmd");
+        var needsElevation = RequiresElevationForFolder(targetFolder);
         var script = $"""
             @echo off
-            ping 127.0.0.1 -n 3 >nul
-            robocopy "{stagingFolder}" "{targetFolder}" /E /IS /IT /R:2 /W:2 /NFL /NDL /NJH /NJS /nc /ns /np >nul
+            taskkill /IM SonicScribe.exe /F >nul 2>&1
+            ping 127.0.0.1 -n 5 >nul
+            robocopy "{stagingFolder}" "{targetFolder}" /E /IS /IT /R:3 /W:2 /NFL /NDL /NJH /NJS /nc /ns /np
+            if errorlevel 8 exit /b 1
             start "" "{exePath}"
-            exit
+            exit /b 0
             """;
 
         await File.WriteAllTextAsync(scriptPath, script, cancellationToken);
@@ -165,13 +141,32 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
             Percent = 100
         });
 
-        Process.Start(new ProcessStartInfo
+        var scriptStartInfo = new ProcessStartInfo
         {
             FileName = scriptPath,
             CreateNoWindow = true,
             UseShellExecute = true,
             WindowStyle = ProcessWindowStyle.Hidden
-        });
+        };
+
+        if (needsElevation)
+        {
+            scriptStartInfo.Verb = "runas";
+        }
+
+        try
+        {
+            Process.Start(scriptStartInfo);
+        }
+        catch (System.ComponentModel.Win32Exception) when (needsElevation)
+        {
+            return new AppUpdateResult
+            {
+                ErrorMessage =
+                    "Windows needs administrator approval to update SonicScribe in Program Files. "
+                    + "Approve the prompt, or download the installer from GitHub and run it manually."
+            };
+        }
 
         _logger.LogInformation("Launched portable update script for v{Version}", update.LatestVersion);
         return new AppUpdateResult { Success = true, RestartScheduled = true };
@@ -218,24 +213,12 @@ public sealed class AppUpdateService : IAppUpdateService, IDisposable
         }
     }
 
-    private static bool DetectInstalledCopy()
+    private static bool RequiresElevationForFolder(string folder)
     {
-        var exePath = Environment.ProcessPath;
-        if (string.IsNullOrWhiteSpace(exePath))
-        {
-            return false;
-        }
-
-        var directory = Path.GetDirectoryName(exePath) ?? string.Empty;
-        string[] installMarkers =
-        [
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "SonicScribe"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "SonicScribe"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "SonicScribe")
-        ];
-
-        return installMarkers.Any(marker =>
-            directory.StartsWith(marker, StringComparison.OrdinalIgnoreCase));
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        return folder.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase)
+            || folder.StartsWith(programFilesX86, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose() => _httpClient.Dispose();

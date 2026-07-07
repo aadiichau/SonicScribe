@@ -106,8 +106,10 @@ public partial class AboutViewModel : ObservableObject
         }
     }
 
-    private bool CanDownloadUpdate() =>
+    public bool IsDownloadUpdateEnabled =>
         IsUpdateAvailable && !IsCheckingForUpdates && !IsApplyingUpdate;
+
+    private bool CanDownloadUpdate() => IsDownloadUpdateEnabled;
 
     private async Task RefreshUpdateStatusAsync(bool forceRefresh)
     {
@@ -132,13 +134,26 @@ public partial class AboutViewModel : ObservableObject
         finally
         {
             IsCheckingForUpdates = false;
+            OnPropertyChanged(nameof(IsDownloadUpdateEnabled));
             DownloadUpdateCommand.NotifyCanExecuteChanged();
         }
     }
 
-    partial void OnIsUpdateAvailableChanged(bool value) =>
+    partial void OnIsUpdateAvailableChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsDownloadUpdateEnabled));
         DownloadUpdateCommand.NotifyCanExecuteChanged();
+    }
 
-    partial void OnIsApplyingUpdateChanged(bool value) =>
+    partial void OnIsApplyingUpdateChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsDownloadUpdateEnabled));
         DownloadUpdateCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsCheckingForUpdatesChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsDownloadUpdateEnabled));
+        DownloadUpdateCommand.NotifyCanExecuteChanged();
+    }
 }

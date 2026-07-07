@@ -26,8 +26,21 @@ public sealed class UpdatePromptService
         CancellationToken cancellationToken = default)
     {
         var xamlRoot = _windowContext.XamlRoot;
-        if (xamlRoot is null || !result.IsUpdateAvailable)
+        if (xamlRoot is null)
         {
+            return false;
+        }
+
+        if (!result.IsUpdateAvailable)
+        {
+            var unavailableDialog = new ContentDialog
+            {
+                Title = "No update available",
+                Content = $"You are already on SonicScribe v{result.CurrentVersion}.",
+                CloseButtonText = "Close",
+                XamlRoot = xamlRoot
+            };
+            await unavailableDialog.ShowAsync();
             return false;
         }
 

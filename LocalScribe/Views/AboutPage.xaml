@@ -104,6 +104,7 @@
                         <Button
                             Command="{x:Bind ViewModel.DownloadUpdateCommand}"
                             Content="Update now"
+                            IsEnabled="{x:Bind ViewModel.IsDownloadUpdateEnabled, Mode=OneWay}"
                             Style="{StaticResource AccentButtonStyle}" />
                         <ProgressRing
                             Width="20"
